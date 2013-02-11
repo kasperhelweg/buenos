@@ -41,6 +41,12 @@
 #include "kernel/assert.h"
 
 /**
+ * Internal Prototypes
+ */
+int syscall_read(int filehandle, void *buffer, int length);
+int syscall_write(int filehandle, const void *buffer, int length);
+
+/**
  * Handle system calls. Interrupts are enabled when this function is
  * called.
  *
@@ -63,7 +69,7 @@ void syscall_handle(context_t *user_context)
         halt_kernel();
         break;
     case SYSCALL_READ:
-      halt_kernel();
+      syscall_read(0, 0, 0 );
       break;
     case SYSCALL_WRITE:
       halt_kernel();
@@ -75,4 +81,23 @@ void syscall_handle(context_t *user_context)
 
     /* Move to next instruction after system call */
     user_context->pc += 4;
+    
+    
+}
+
+int syscall_read( int filehandle, void* buffer, int length )
+{
+  int f = filehandle;
+  void* b = buffer;
+  int l = length;
+  return f + *(int*)b + l;
+}
+
+int syscall_write( int filehandle, const void* buffer, int length )
+{
+  int f = filehandle;
+  const void* b = buffer;
+  int l = length;
+  return f + *(int*)b + l;
+  
 }
