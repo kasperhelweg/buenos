@@ -23,4 +23,7 @@
 # Specific exec's
 buenos
 tfstool
+
+# Userland exec's
 halt
+readwrite
