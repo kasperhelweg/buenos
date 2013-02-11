@@ -1,0 +1,26 @@
+# Object files
+*.o
+
+# Libraries
+*.lib
+*.a
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+*.d
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Harddisks
+*.harddisk
+
+# Specific exec's
+buenos
+tfstool
+halt
