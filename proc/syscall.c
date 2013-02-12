@@ -40,6 +40,11 @@
 #include "lib/libc.h"
 #include "kernel/assert.h"
 
+#include "lib/debug.h"
+
+#include "drivers/device.h"
+#include "drivers/gcd.h"
+
 /**
  * Internal Prototypes
  */
@@ -64,33 +69,64 @@ void syscall_handle(context_t *user_context)
      * returning from this function the userland context will be
      * restored from user_context.
      */
-    switch(user_context->cpu_regs[MIPS_REGISTER_A0]) {
-    case SYSCALL_HALT:
-        halt_kernel();
-        break;
-    case SYSCALL_READ:
-      syscall_read(0, 0, 0 );
-      break;
-    case SYSCALL_WRITE:
-      halt_kernel();
+  
+  DEBUG( "debugsyscalls", "in syscall_handle\n" );
+  DEBUG("debugsyscalls", "REGISTER_A1: %d, ", user_context->cpu_regs[MIPS_REGISTER_A1]);
+  DEBUG("debugsyscalls", "REGISTER_A2: %d, ", user_context->cpu_regs[MIPS_REGISTER_A2]);
+  DEBUG("debugsyscalls", "REGISTER_A3: %d\n", user_context->cpu_regs[MIPS_REGISTER_A3]);
+  
+ 
+  switch(user_context->cpu_regs[MIPS_REGISTER_A0]) {
+  case SYSCALL_HALT:
+    halt_kernel();
+    break;
+  case SYSCALL_READ:
+    user_context->cpu_regs[MIPS_REGISTER_V0] = 
+      syscall_read(
+                   user_context->cpu_regs[MIPS_REGISTER_A1], 
+                   (char*)user_context->cpu_regs[MIPS_REGISTER_A2], 
+                   user_context->cpu_regs[MIPS_REGISTER_A3]
+                   );
+    break;
+  case SYSCALL_WRITE:
+      syscall_write( 0, 0, 0 );
       break;
       
-    default: 
-        KERNEL_PANIC("Unhandled system call\n");
-    }
-
-    /* Move to next instruction after system call */
-    user_context->pc += 4;
-    
-    
+  default: 
+    KERNEL_PANIC("Unhandled system call\n");
+  }
+  
+  /* Move to next instruction after system call */
+  user_context->pc += 4;
 }
+
+/**
+ * Syscall implementations. 
+ * Maybe move to seperate files later on?
+ */
 
 int syscall_read( int filehandle, void* buffer, int length )
 {
-  int f = filehandle;
-  void* b = buffer;
-  int l = length;
-  return f + *(int*)b + l;
+  DEBUG( "debugsyscalls", "in syscall_handle / syscall_read\n" );
+  
+  DEBUG( "debugsyscalls", "filehandle: %d, ", filehandle );
+  DEBUG( "debugsyscalls", "buffer: %d, ", (int*)buffer );
+  DEBUG( "debugsyscalls", "length: %d\n", length );
+  
+  device_t* dev = NULL;
+  gcd_t* gcd = NULL;
+
+  if( filehandle != 0 ) {
+    KERNEL_PANIC( "Only stdin is allowed for read\n" );
+  } else {
+    dev = device_get( YAMS_TYPECODE_TTY, 0 );
+    KERNEL_ASSERT(dev != NULL);
+    
+    gcd = (gcd_t*)dev->generic_device;
+    KERNEL_ASSERT(gcd != NULL);
+  }
+
+  return gcd->read( gcd, buffer, length );
 }
 
 int syscall_write( int filehandle, const void* buffer, int length )
@@ -99,5 +135,4 @@ int syscall_write( int filehandle, const void* buffer, int length )
   const void* b = buffer;
   int l = length;
   return f + *(int*)b + l;
-  
 }
