@@ -89,9 +89,15 @@ void syscall_handle(context_t *user_context)
                    );
     break;
   case SYSCALL_WRITE:
-      syscall_write( 0, 0, 0 );
-      break;
-      
+    user_context->cpu_regs[MIPS_REGISTER_V0] = 
+      syscall_write(
+                    user_context->cpu_regs[MIPS_REGISTER_A1], 
+                    (char*)user_context->cpu_regs[MIPS_REGISTER_A2], 
+                    user_context->cpu_regs[MIPS_REGISTER_A3]
+                    );
+    
+    break;
+    
   default: 
     KERNEL_PANIC("Unhandled system call\n");
   }
@@ -115,7 +121,7 @@ int syscall_read( int filehandle, void* buffer, int length )
   
   device_t* dev = NULL;
   gcd_t* gcd = NULL;
-
+  
   if( filehandle != 0 ) {
     KERNEL_PANIC( "Only stdin is allowed for read\n" );
   } else {
@@ -125,14 +131,30 @@ int syscall_read( int filehandle, void* buffer, int length )
     gcd = (gcd_t*)dev->generic_device;
     KERNEL_ASSERT(gcd != NULL);
   }
-
+  
   return gcd->read( gcd, buffer, length );
 }
 
 int syscall_write( int filehandle, const void* buffer, int length )
 {
-  int f = filehandle;
-  const void* b = buffer;
-  int l = length;
-  return f + *(int*)b + l;
+  DEBUG( "debugsyscalls", "in syscall_handle / syscall_write\n" );
+  
+  DEBUG( "debugsyscalls", "filehandle: %d, ", filehandle );
+  DEBUG( "debugsyscalls", "buffer: %d, ", (int*)buffer );
+  DEBUG( "debugsyscalls", "length: %d\n", length );
+  
+  device_t* dev = NULL;
+  gcd_t* gcd = NULL;
+   
+  if( filehandle != 1 ) {
+    KERNEL_PANIC( "Only stdout is allowed for write\n" );
+  } else {
+    dev = device_get( YAMS_TYPECODE_TTY, 0 );
+    KERNEL_ASSERT(dev != NULL);
+    
+    gcd = (gcd_t*)dev->generic_device;
+    KERNEL_ASSERT(gcd != NULL);
+  }
+  
+  return gcd->write( gcd, buffer, length );
 }
