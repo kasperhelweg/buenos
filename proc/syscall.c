@@ -124,16 +124,21 @@ int syscall_read( int filehandle, void* buffer, int length )
   device_t* dev = NULL;
   gcd_t* gcd = NULL;
   
+  /* Check for correct filehandle STDIN 
+   * Not sure if this should be done here...but for now it is.
+   */
   if( filehandle != FILEHANDLE_STDIN ) {
+    /* not very "bulletproof" */
     KERNEL_PANIC( "Only stdin is allowed for read\n" );
   } else {
+    /* attach to console. the kernel asserts should probably not be used */
     dev = device_get( YAMS_TYPECODE_TTY, 0 );
     KERNEL_ASSERT( dev != NULL );
     
     gcd = (gcd_t*)dev->generic_device;
     KERNEL_ASSERT( gcd != NULL );
   }
-  
+  /* read into buffer */
   return gcd->read( gcd, buffer, length );
 }
 
@@ -148,16 +153,20 @@ int syscall_write( int filehandle, const void* buffer, int length )
   device_t* dev = NULL;
   gcd_t* gcd = NULL;
 
-  /* not stdout */ 
+  /* Check for correct filehandle STDOUT 
+   * Not sure if this should be done here...but for now it is.
+   */
   if( filehandle != FILEHANDLE_STDOUT ) {
+    /* not very "bulletproof" */
     KERNEL_PANIC( "Only stdout is allowed for write\n" );
   } else {
+    /* attach to console. the kernel asserts should probably not be used */
     dev = device_get( YAMS_TYPECODE_TTY, 0 );
     KERNEL_ASSERT( dev != NULL );
     
     gcd = (gcd_t*)dev->generic_device;
     KERNEL_ASSERT( gcd != NULL );
   }
-  
+  /* write from buffer */
   return gcd->write( gcd, buffer, length );
 }
