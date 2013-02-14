@@ -54,7 +54,7 @@
 #define SYSCALL_CREATE 0x206
 #define SYSCALL_DELETE 0x207
 
-/* When userland program reads or writes these already open files it
+/* When userland programs reads or writes these already open files it
  * actually accesses the console.
  */
 #define FILEHANDLE_STDIN 0

@@ -43,14 +43,14 @@
 /* The device driver instance structure */
 typedef struct {
     /* Pointer to device driver's internal data */
-    void *real_device;
+    void* real_device;
 
     /* Pointer to generic device handle. NULL if not implemented by 
        the driver */
-    void *generic_device;
+    void* generic_device;
 
     /* Pointer to the device descriptor record of YAMS */
-    io_descriptor_t *descriptor;
+    io_descriptor_t* descriptor;
 
     /* Start of the memory-mapped io area of the device */
     uint32_t io_address;
@@ -60,6 +60,6 @@ typedef struct {
 } device_t;
 
 void device_init(void);
-device_t *device_get(uint32_t typecode, uint32_t n);
+device_t* device_get(uint32_t typecode, uint32_t n);
 
 #endif 

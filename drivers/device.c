@@ -39,6 +39,8 @@
 #include "kernel/config.h"
 #include "drivers/drivers.h"
 
+#include "lib/debug.h"
+
 /**@name Device Drivers
  *
  * This module contains functions for initializing device drivers and
@@ -48,7 +50,7 @@
  */
 
 /** Table of initialized device drivers. */
-static device_t *device_table[CONFIG_MAX_DEVICES];
+static device_t* device_table[CONFIG_MAX_DEVICES];
 
 /** Number of initialized device drivers. */
 static int number_of_devices = 0;
@@ -60,7 +62,7 @@ static int number_of_devices = 0;
  *
  * @return Device driver descriptor. NULL if not found.
  */
-static drivers_available_t *find_driver(uint32_t typecode)
+static drivers_available_t* find_driver(uint32_t typecode)
 {
     drivers_available_t *driver;
 
@@ -137,10 +139,10 @@ void device_init(void)
  *
  * @return The device driver. NULL if not found or n too large.
  */
-device_t *device_get(uint32_t typecode, uint32_t n)
+device_t* device_get(uint32_t typecode, uint32_t n)
 {
     int i;
-
+    
     for(i = 0; i < number_of_devices; i++) {
         if (device_table[i]->type == typecode) {
             if (n == 0)

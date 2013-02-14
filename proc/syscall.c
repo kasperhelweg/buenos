@@ -71,14 +71,14 @@ void syscall_handle(context_t *user_context)
      */
   
   DEBUG( "debugsyscalls", "in syscall_handle\n" );
-  DEBUG("debugsyscalls", "REGISTER_A1: %d, ", user_context->cpu_regs[MIPS_REGISTER_A1]);
-  DEBUG("debugsyscalls", "REGISTER_A2: %d, ", user_context->cpu_regs[MIPS_REGISTER_A2]);
-  DEBUG("debugsyscalls", "REGISTER_A3: %d\n", user_context->cpu_regs[MIPS_REGISTER_A3]);
+  DEBUG( "debugsyscalls", "REGISTER_A1: %d, ", user_context->cpu_regs[MIPS_REGISTER_A1] );
+  DEBUG( "debugsyscalls", "REGISTER_A2: %d, ", user_context->cpu_regs[MIPS_REGISTER_A2] );
+  DEBUG( "debugsyscalls", "REGISTER_A3: %d\n", user_context->cpu_regs[MIPS_REGISTER_A3] );
   
  
   switch(user_context->cpu_regs[MIPS_REGISTER_A0]) {
   case SYSCALL_HALT:
-    halt_kernel();
+    halt_kernel( );
     break;
   case SYSCALL_READ:
     user_context->cpu_regs[MIPS_REGISTER_V0] = 
@@ -99,8 +99,10 @@ void syscall_handle(context_t *user_context)
     break;
     
   default: 
-    KERNEL_PANIC("Unhandled system call\n");
+    KERNEL_PANIC( "Unhandled system call\n" );
   }
+
+  DEBUG( "debugsyscalls", "REGISTER_V0 on return: %d\n", user_context->cpu_regs[MIPS_REGISTER_V0] );
   
   /* Move to next instruction after system call */
   user_context->pc += 4;
@@ -122,14 +124,14 @@ int syscall_read( int filehandle, void* buffer, int length )
   device_t* dev = NULL;
   gcd_t* gcd = NULL;
   
-  if( filehandle != 0 ) {
+  if( filehandle != FILEHANDLE_STDIN ) {
     KERNEL_PANIC( "Only stdin is allowed for read\n" );
   } else {
     dev = device_get( YAMS_TYPECODE_TTY, 0 );
-    KERNEL_ASSERT(dev != NULL);
+    KERNEL_ASSERT( dev != NULL );
     
     gcd = (gcd_t*)dev->generic_device;
-    KERNEL_ASSERT(gcd != NULL);
+    KERNEL_ASSERT( gcd != NULL );
   }
   
   return gcd->read( gcd, buffer, length );
@@ -145,15 +147,16 @@ int syscall_write( int filehandle, const void* buffer, int length )
   
   device_t* dev = NULL;
   gcd_t* gcd = NULL;
-   
-  if( filehandle != 1 ) {
+
+  /* not stdout */ 
+  if( filehandle != FILEHANDLE_STDOUT ) {
     KERNEL_PANIC( "Only stdout is allowed for write\n" );
   } else {
     dev = device_get( YAMS_TYPECODE_TTY, 0 );
-    KERNEL_ASSERT(dev != NULL);
+    KERNEL_ASSERT( dev != NULL );
     
     gcd = (gcd_t*)dev->generic_device;
-    KERNEL_ASSERT(gcd != NULL);
+    KERNEL_ASSERT( gcd != NULL );
   }
   
   return gcd->write( gcd, buffer, length );

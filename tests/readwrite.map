@@ -14,7 +14,7 @@ Linker script and memory map
 
                 0x0000000000001000                . = 0x1000
 
-ro_segment      0x0000000000001000      0x4d8
+ro_segment      0x0000000000001000      0x510
  *(.text .rodata .rodata.*)
  .text          0x0000000000001000       0x24 crt.o
                 0x0000000000001000                _start
@@ -36,7 +36,7 @@ ro_segment      0x0000000000001000      0x4d8
                 0x0000000000001368                syscall_write
                 0x00000000000013bc                syscall_create
                 0x000000000000140c                syscall_delete
- .text          0x0000000000001454       0x84 readwrite.o
+ .text          0x0000000000001454       0xbc readwrite.o
                 0x0000000000001454                main
 
 rw_segment      0x0000000000002000        0x0
