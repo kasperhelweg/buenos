@@ -264,8 +264,10 @@ static int tty_read(gcd_t *gcd, void *buf, int len)
         = (tty_real_device_t *)gcd->device->real_device;
     int i;
     
+    /* ====== DEBUG START ====== */
     DEBUG( "debug_tty", "waiting for read\n" );
-    
+    /* ====== DEBUG END ====== */
+
     intr_status = _interrupt_disable();
     spinlock_acquire(tty_rd->slock);
 
@@ -292,7 +294,9 @@ static int tty_read(gcd_t *gcd, void *buf, int len)
     spinlock_release(tty_rd->slock);
     _interrupt_set_state(intr_status);
 
+    /* ====== DEBUG START ====== */
     DEBUG( "debug_tty", "read done\n" );
+    /* ====== DEBUG END ====== */
 
     return i;
 }

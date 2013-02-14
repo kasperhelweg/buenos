@@ -69,13 +69,15 @@ void syscall_handle(context_t *user_context)
      * returning from this function the userland context will be
      * restored from user_context.
      */
-  
-  DEBUG( "debugsyscalls", "in syscall_handle\n" );
-  DEBUG( "debugsyscalls", "REGISTER_A1: %d, ", user_context->cpu_regs[MIPS_REGISTER_A1] );
-  DEBUG( "debugsyscalls", "REGISTER_A2: %d, ", user_context->cpu_regs[MIPS_REGISTER_A2] );
-  DEBUG( "debugsyscalls", "REGISTER_A3: %d\n", user_context->cpu_regs[MIPS_REGISTER_A3] );
-  
+
+  /* ====== DEBUG START ====== */
+  DEBUG( "debug_syscalls", "in syscall_handle\n" );
+  DEBUG( "debug_syscalls", "REGISTER_A1: %d, ", user_context->cpu_regs[MIPS_REGISTER_A1] );
+  DEBUG( "debug_syscalls", "REGISTER_A2: %d, ", user_context->cpu_regs[MIPS_REGISTER_A2] );
+  DEBUG( "debug_syscalls", "REGISTER_A3: %d\n", user_context->cpu_regs[MIPS_REGISTER_A3] );
+  /* ====== DEBUG END ====== */
  
+  /* handle syscalls */
   switch(user_context->cpu_regs[MIPS_REGISTER_A0]) {
   case SYSCALL_HALT:
     halt_kernel( );
@@ -102,8 +104,10 @@ void syscall_handle(context_t *user_context)
     KERNEL_PANIC( "Unhandled system call\n" );
   }
 
-  DEBUG( "debugsyscalls", "REGISTER_V0 on return: %d\n", user_context->cpu_regs[MIPS_REGISTER_V0] );
-  
+  /* ====== DEBUG START ====== */
+  DEBUG( "debug_syscalls", "REGISTER_V0 on return: %d\n", user_context->cpu_regs[MIPS_REGISTER_V0] );
+  /* ====== DEBUG END ====== */
+
   /* Move to next instruction after system call */
   user_context->pc += 4;
 }
@@ -115,12 +119,14 @@ void syscall_handle(context_t *user_context)
 
 int syscall_read( int filehandle, void* buffer, int length )
 {
-  DEBUG( "debugsyscalls", "in syscall_handle / syscall_read\n" );
+  /* ====== DEBUG START ====== */
+  DEBUG( "debug_syscalls", "in syscall_handle / syscall_read\n" );
   
-  DEBUG( "debugsyscalls", "filehandle: %d, ", filehandle );
-  DEBUG( "debugsyscalls", "buffer: %d, ", (int*)buffer );
-  DEBUG( "debugsyscalls", "length: %d\n", length );
-  
+  DEBUG( "debug_syscalls", "filehandle: %d, ", filehandle );
+  DEBUG( "debug_syscalls", "buffer: %d, ", (int*)buffer );
+  DEBUG( "debug_syscalls", "length: %d\n", length );
+  /* ====== DEBUG END ====== */
+
   device_t* dev = NULL;
   gcd_t* gcd = NULL;
   
@@ -144,12 +150,14 @@ int syscall_read( int filehandle, void* buffer, int length )
 
 int syscall_write( int filehandle, const void* buffer, int length )
 {
-  DEBUG( "debugsyscalls", "in syscall_handle / syscall_write\n" );
-  
-  DEBUG( "debugsyscalls", "filehandle: %d, ", filehandle );
-  DEBUG( "debugsyscalls", "buffer: %d, ", (int*)buffer );
-  DEBUG( "debugsyscalls", "length: %d\n", length );
-  
+  /* ====== DEBUG START ====== */
+  DEBUG( "debug_syscalls", "in syscall_handle / syscall_write\n" );
+
+  DEBUG( "debug_syscalls", "filehandle: %d, ", filehandle );
+  DEBUG( "debug_syscalls", "buffer: %d, ", (int*)buffer );
+  DEBUG( "debug_syscalls", "length: %d\n", length );
+  /* ====== DEBUG END ====== */
+
   device_t* dev = NULL;
   gcd_t* gcd = NULL;
 
