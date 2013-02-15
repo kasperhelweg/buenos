@@ -105,7 +105,7 @@ void syscall_handle(context_t *user_context)
   }
 
   /* ====== DEBUG START ====== */
-  DEBUG( "debug_syscalls", "REGISTER_V0 on return: %d\n", user_context->cpu_regs[MIPS_REGISTER_V0] );
+  DEBUG( "debug_syscalls", "\nREGISTER_V0 on return: %d\n", user_context->cpu_regs[MIPS_REGISTER_V0] );
   /* ====== DEBUG END ====== */
 
   /* Move to next instruction after system call */
