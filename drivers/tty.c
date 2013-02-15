@@ -46,6 +46,7 @@
 #include "drivers/gcd.h"
 #include "drivers/tty.h"
 
+#include "lib/debug.h"
 /**@name TTY driver
  *
  * This module contains functions for interrupt driven TTY driver.
@@ -262,18 +263,24 @@ static int tty_read(gcd_t *gcd, void *buf, int len)
     volatile tty_real_device_t *tty_rd
         = (tty_real_device_t *)gcd->device->real_device;
     int i;
+    
+    /* ====== DEBUG START ====== */
+    DEBUG( "debug_tty", "waiting for read\n" );
+    /* ====== DEBUG END ====== */
 
     intr_status = _interrupt_disable();
     spinlock_acquire(tty_rd->slock);
 
+    
+    /* while (tty_rd->read_count < len) { */
     while (tty_rd->read_count == 0) {
-	/* buffer is empty, so wait it to be filled */
+        /* buffer is empty, so wait it to be filled */
         sleepq_add((void *)tty_rd->read_buf);
         spinlock_release(tty_rd->slock);
         thread_switch();
         spinlock_acquire(tty_rd->slock);
     }
-
+    
 
     /* Data is read to internal buffer by interrupt driver. Number of
        chars read is stored to i. */
@@ -286,6 +293,10 @@ static int tty_read(gcd_t *gcd, void *buf, int len)
 
     spinlock_release(tty_rd->slock);
     _interrupt_set_state(intr_status);
+
+    /* ====== DEBUG START ====== */
+    DEBUG( "debug_tty", "read done\n" );
+    /* ====== DEBUG END ====== */
 
     return i;
 }

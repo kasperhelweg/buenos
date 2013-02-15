@@ -84,7 +84,6 @@ void init_startup_fallback(void) {
         dev = device_get(YAMS_TYPECODE_TTY, 0);
         KERNEL_ASSERT(dev != NULL);
 
-
         gcd = (gcd_t *)dev->generic_device;
         KERNEL_ASSERT(gcd != NULL);
 
