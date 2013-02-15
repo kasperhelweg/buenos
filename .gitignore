@@ -20,6 +20,9 @@
 # Harddisks
 *.harddisk
 
+# Maps 
+*.map
+
 # Specific exec's
 buenos
 tfstool
