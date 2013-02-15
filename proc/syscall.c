@@ -71,7 +71,7 @@ void syscall_handle(context_t *user_context)
      */
 
   /* ====== DEBUG START ====== */
-  DEBUG( "ddebug_syscalls", "in syscall_handle\n" );
+  DEBUG( "debug_syscalls", "in syscall_handle\n" );
   DEBUG( "debug_syscalls", "REGISTER_A1: %d, ", user_context->cpu_regs[MIPS_REGISTER_A1] );
   DEBUG( "debug_syscalls", "REGISTER_A2: %d, ", user_context->cpu_regs[MIPS_REGISTER_A2] );
   DEBUG( "debug_syscalls", "REGISTER_A3: %d\n", user_context->cpu_regs[MIPS_REGISTER_A3] );
