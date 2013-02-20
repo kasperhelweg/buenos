@@ -127,9 +127,6 @@ void init_startup_thread(uint32_t arg)
      /* initialize the process table */
     kwrite("Initializing process table\n");
     
-    
-    
-
     if(bootargs_get("initprog") == NULL) {
 	kprintf("No initial program (initprog), dropping to fallback\n");
 	init_startup_fallback();

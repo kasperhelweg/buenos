@@ -85,15 +85,15 @@ void process_start( const char* executable )
   /* get and set id of process. could be cleaner
    * the process id is always just the index into process table
    * this works kind of weel and is OK efficient
-   * process_id = -1 if no more processes are alloud
    */
-  i = 0;
-  while( process_table[i].state != PROCESS_FREE && i < PROCESS_MAX_PROCESSES ) { i++; }
-  if( process_table[i].state == PROCESS_FREE ) { process_id = i; } else { process_id = -1; }
+  process_id = 0;
+  while( process_table[process_id].state != PROCESS_FREE && process_id < PROCESS_MAX_PROCESSES ) { process_id++; }
   
-  if ( process_id == -1) { /* do something! */ }
-  else { my_entry->process_id = process_id; }
-    
+  if( process_table[process_id].state == PROCESS_FREE ) { 
+    my_entry->process_id = process_id; 
+  } else { 
+    /* do something */ 
+  }
 
   /* If the pagetable of this thread is not NULL, we are trying to
      run a userland process for a second time in the same thread.
@@ -192,6 +192,12 @@ void process_start( const char* executable )
   tlb_fill(my_entry->pagetable);
   _interrupt_set_state(intr_status);
 
+  /* set entries in PCB. 
+   * Don't know if this should be here or moved to the process_id loop 
+   */
+  process_table[process_id].pid = process_id;
+  process_table[process_id].state = PROCESS_READY;
+  
   /* Initialize the user context. (Status register is handled by
      thread_goto_userland) */
   memoryset(&user_context, 0, sizeof(user_context));
