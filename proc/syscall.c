@@ -46,12 +46,6 @@
 #include "drivers/gcd.h"
 
 /**
- * Internal Prototypes
- */
-int syscall_read(int filehandle, void *buffer, int length);
-int syscall_write(int filehandle, const void *buffer, int length);
-
-/**
  * Handle system calls. Interrupts are enabled when this function is
  * called.
  *
@@ -97,6 +91,12 @@ void syscall_handle(context_t *user_context)
                     (char*)user_context->cpu_regs[MIPS_REGISTER_A2], 
                     user_context->cpu_regs[MIPS_REGISTER_A3]
                     );
+    break;
+  case SYSCALL_EXEC:
+    break;
+  case SYSCALL_EXIT:
+    break;
+  case SYSCALL_JOIN:
     break;
   default: 
     KERNEL_PANIC( "Unhandled system call\n" );
@@ -175,4 +175,22 @@ int syscall_write( int filehandle, const void* buffer, int length )
   }
   /* write from buffer */
   return gcd->write( gcd, buffer, length );
+}
+
+
+int syscall_exec(const char* filename)
+{
+  filename = filename;
+  return 0;
+}
+
+void syscall_exit(int retval)
+{
+  retval = retval;
+}
+
+int syscall_join(int pid)
+{
+  pid = pid;
+  return 0;
 }
