@@ -40,6 +40,8 @@
 typedef int process_id_t;
 typedef int process_state_t;
 
+typedef int filedescriptor_id_t;
+
 void process_start( const char* executable );
 
 #define USERLAND_STACK_TOP 0x7fffeffc
@@ -54,16 +56,22 @@ void process_start( const char* executable );
 #define PROCESS_STATE_ZOMBIE  3
 
 typedef struct process_control_block_t {
-  /* the process pid*/
+  /* the process id*/
   process_id_t pid;
   /* state of the process */
   process_state_t state;
   
   /* parent process stuff */
   struct process_control_block_t* parent;
-  process_id_t parent_pid;
-  
+    
 } process_control_block_t;
+
+/* choose a datastrucure to hold files */ 
+typedef struct process_file_descriptor_t {
+  /* the filedescriptor id*/
+  filedescriptor_id_t fid;
+
+} process_file_descriptor_t;
 
 /* Initialize the process table.  This must be called during kernel
    startup before any other process-related calls. */

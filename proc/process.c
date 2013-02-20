@@ -192,7 +192,7 @@ void process_init( void ) {
   KERNEL_PANIC("Not implemented.");
 }
 
-process_id_t process_spawn( const char *executable ) {
+process_id_t process_spawn( const char* executable ) {
   executable = executable;
   KERNEL_PANIC("Not implemented.");
   return 0; /* Dummy */
