@@ -1,5 +1,5 @@
 #include "tests/lib.h"
-
+#include "lib/debug.h"
 
 int main( void )
 {
