@@ -38,6 +38,7 @@
 #define BUENOS_PROC_PROCESS
 
 typedef int process_id_t;
+typedef int process_state_t;
 
 void process_start( const char* executable );
 
@@ -48,9 +49,20 @@ void process_start( const char* executable );
 
 #define PROCESS_MAX_PROCESSES 32
 
-typedef struct {
-  /* STUB: Put something here. */
-  int dummy; /* Remove this. */
+/* state definitions */
+#define PROCESS_STATE_RUNNIG  1
+#define PROCESS_STATE_ZOMBIE  3
+
+typedef struct process_control_block_t {
+  /* the process pid*/
+  process_id_t pid;
+  /* state of the process */
+  process_state_t state;
+  
+  /* parent process stuff */
+  struct process_control_block_t* parent;
+  process_id_t parent_pid;
+  
 } process_control_block_t;
 
 /* Initialize the process table.  This must be called during kernel
@@ -72,6 +84,6 @@ int process_join( process_id_t pid );
 process_id_t process_get_current_process( void );
 
 /* Return PCB of current process. */
-process_control_block_t *process_get_current_process_entry( void );
+process_control_block_t* process_get_current_process_entry( void );
 
 #endif
