@@ -45,6 +45,7 @@
 #include "vm/vm.h"
 #include "vm/pagepool.h"
 
+#include "lib/debug.h"
 /** @name Process startup
  *
  * This module contains facilities for managing userland process.
@@ -66,130 +67,152 @@ process_control_block_t process_table[PROCESS_MAX_PROCESSES];
  */
 void process_start( const char* executable )
 {
-    thread_table_t *my_entry;
-    pagetable_t *pagetable;
-    uint32_t phys_page;
-    context_t user_context;
-    uint32_t stack_bottom;
-    elf_info_t elf;
-    openfile_t file;
+  thread_table_t* my_entry;
+  process_id_t process_id;
+  pagetable_t* pagetable;
+  uint32_t phys_page;
+  context_t user_context;
+  uint32_t stack_bottom;
+  elf_info_t elf;
+  openfile_t file;
 
-    int i;
+  int i;
 
-    interrupt_status_t intr_status;
+  interrupt_status_t intr_status;
 
-    my_entry = thread_get_current_thread_entry( );
+  my_entry = thread_get_current_thread_entry( );
 
-    /* If the pagetable of this thread is not NULL, we are trying to
-       run a userland process for a second time in the same thread.
-       This is not possible. */
-    KERNEL_ASSERT(my_entry->pagetable == NULL);
-
-    pagetable = vm_create_pagetable(thread_get_current_thread());
-    KERNEL_ASSERT(pagetable != NULL);
-
-    intr_status = _interrupt_disable();
-    my_entry->pagetable = pagetable;
-    _interrupt_set_state(intr_status);
-
-    file = vfs_open((char *)executable);
-    /* Make sure the file existed and was a valid ELF file */
-    KERNEL_ASSERT(file >= 0);
-    KERNEL_ASSERT(elf_parse_header(&elf, file));
-
-    /* Trivial and naive sanity check for entry point: */
-    KERNEL_ASSERT(elf.entry_point >= PAGE_SIZE);
-
-    /* Calculate the number of pages needed by the whole process
-       (including userland stack). Since we don't have proper tlb
-       handling code, all these pages must fit into TLB. */
-    KERNEL_ASSERT(elf.ro_pages + elf.rw_pages + CONFIG_USERLAND_STACK_SIZE
-		  <= _tlb_get_maxindex() + 1);
-
-    /* Allocate and map stack */
-    for(i = 0; i < CONFIG_USERLAND_STACK_SIZE; i++) {
-        phys_page = pagepool_get_phys_page();
-        KERNEL_ASSERT(phys_page != 0);
-        vm_map(my_entry->pagetable, phys_page, 
-               (USERLAND_STACK_TOP & PAGE_SIZE_MASK) - i*PAGE_SIZE, 1);
-    }
-
-    /* Allocate and map pages for the segments. We assume that
-       segments begin at page boundary. (The linker script in tests
-       directory creates this kind of segments) */
-    for(i = 0; i < (int)elf.ro_pages; i++) {
-        phys_page = pagepool_get_phys_page();
-        KERNEL_ASSERT(phys_page != 0);
-        vm_map(my_entry->pagetable, phys_page, 
-               elf.ro_vaddr + i*PAGE_SIZE, 1);
-    }
-
-    for(i = 0; i < (int)elf.rw_pages; i++) {
-        phys_page = pagepool_get_phys_page();
-        KERNEL_ASSERT(phys_page != 0);
-        vm_map(my_entry->pagetable, phys_page, 
-               elf.rw_vaddr + i*PAGE_SIZE, 1);
-    }
-
-    /* Put the mapped pages into TLB. Here we again assume that the
-       pages fit into the TLB. After writing proper TLB exception
-       handling this call should be skipped. */
-    intr_status = _interrupt_disable();
-    tlb_fill(my_entry->pagetable);
-    _interrupt_set_state(intr_status);
+  /* get and set id of process. could be cleaner
+   * the process id is always just the index into process table
+   * this works kind of weel and is OK efficient
+   * process_id = -1 if no more processes are alloud
+   */
+  i = 0;
+  while( process_table[i].state != PROCESS_FREE && i < PROCESS_MAX_PROCESSES ) { i++; }
+  if( process_table[i].state == PROCESS_FREE ) { process_id = i; } else { process_id = -1; }
+  
+  if ( process_id == -1) { /* do something! */ }
+  else { my_entry->process_id = process_id; }
     
-    /* Now we may use the virtual addresses of the segments. */
 
-    /* Zero the pages. */
-    memoryset((void *)elf.ro_vaddr, 0, elf.ro_pages*PAGE_SIZE);
-    memoryset((void *)elf.rw_vaddr, 0, elf.rw_pages*PAGE_SIZE);
+  /* If the pagetable of this thread is not NULL, we are trying to
+     run a userland process for a second time in the same thread.
+     This is not possible. */
+  KERNEL_ASSERT(my_entry->pagetable == NULL);
 
-    stack_bottom = (USERLAND_STACK_TOP & PAGE_SIZE_MASK) - 
-        (CONFIG_USERLAND_STACK_SIZE-1)*PAGE_SIZE;
-    memoryset((void *)stack_bottom, 0, CONFIG_USERLAND_STACK_SIZE*PAGE_SIZE);
+  pagetable = vm_create_pagetable(thread_get_current_thread());
+  KERNEL_ASSERT(pagetable != NULL);
 
-    /* Copy segments */
+  intr_status = _interrupt_disable();
+  my_entry->pagetable = pagetable;
+  _interrupt_set_state(intr_status);
 
-    if (elf.ro_size > 0) {
-	/* Make sure that the segment is in proper place. */
-        KERNEL_ASSERT(elf.ro_vaddr >= PAGE_SIZE);
-        KERNEL_ASSERT(vfs_seek(file, elf.ro_location) == VFS_OK);
-        KERNEL_ASSERT(vfs_read(file, (void *)elf.ro_vaddr, elf.ro_size)
-		      == (int)elf.ro_size);
-    }
+  file = vfs_open((char *)executable);
+  /* Make sure the file existed and was a valid ELF file */
+  KERNEL_ASSERT(file >= 0);
+  KERNEL_ASSERT(elf_parse_header(&elf, file));
 
-    if (elf.rw_size > 0) {
-	/* Make sure that the segment is in proper place. */
-        KERNEL_ASSERT(elf.rw_vaddr >= PAGE_SIZE);
-        KERNEL_ASSERT(vfs_seek(file, elf.rw_location) == VFS_OK);
-        KERNEL_ASSERT(vfs_read(file, (void *)elf.rw_vaddr, elf.rw_size)
-		      == (int)elf.rw_size);
-    }
+  /* Trivial and naive sanity check for entry point: */
+  KERNEL_ASSERT(elf.entry_point >= PAGE_SIZE);
+
+  /* Calculate the number of pages needed by the whole process
+     (including userland stack). Since we don't have proper tlb
+     handling code, all these pages must fit into TLB. */
+  KERNEL_ASSERT(elf.ro_pages + elf.rw_pages + CONFIG_USERLAND_STACK_SIZE
+                <= _tlb_get_maxindex() + 1);
+
+  /* Allocate and map stack */
+  for(i = 0; i < CONFIG_USERLAND_STACK_SIZE; i++) {
+    phys_page = pagepool_get_phys_page();
+    KERNEL_ASSERT(phys_page != 0);
+    vm_map(my_entry->pagetable, phys_page, 
+           (USERLAND_STACK_TOP & PAGE_SIZE_MASK) - i*PAGE_SIZE, 1);
+  }
+
+  /* Allocate and map pages for the segments. We assume that
+     segments begin at page boundary. (The linker script in tests
+     directory creates this kind of segments) */
+  for(i = 0; i < (int)elf.ro_pages; i++) {
+    phys_page = pagepool_get_phys_page();
+    KERNEL_ASSERT(phys_page != 0);
+    vm_map(my_entry->pagetable, phys_page, 
+           elf.ro_vaddr + i*PAGE_SIZE, 1);
+  }
+
+  for(i = 0; i < (int)elf.rw_pages; i++) {
+    phys_page = pagepool_get_phys_page();
+    KERNEL_ASSERT(phys_page != 0);
+    vm_map(my_entry->pagetable, phys_page, 
+           elf.rw_vaddr + i*PAGE_SIZE, 1);
+  }
+
+  /* Put the mapped pages into TLB. Here we again assume that the
+     pages fit into the TLB. After writing proper TLB exception
+     handling this call should be skipped. */
+  intr_status = _interrupt_disable();
+  tlb_fill(my_entry->pagetable);
+  _interrupt_set_state(intr_status);
+    
+  /* Now we may use the virtual addresses of the segments. */
+
+  /* Zero the pages. */
+  memoryset((void *)elf.ro_vaddr, 0, elf.ro_pages*PAGE_SIZE);
+  memoryset((void *)elf.rw_vaddr, 0, elf.rw_pages*PAGE_SIZE);
+
+  stack_bottom = (USERLAND_STACK_TOP & PAGE_SIZE_MASK) - 
+    (CONFIG_USERLAND_STACK_SIZE-1)*PAGE_SIZE;
+  memoryset((void *)stack_bottom, 0, CONFIG_USERLAND_STACK_SIZE*PAGE_SIZE);
+
+  /* Copy segments */
+
+  if (elf.ro_size > 0) {
+    /* Make sure that the segment is in proper place. */
+    KERNEL_ASSERT(elf.ro_vaddr >= PAGE_SIZE);
+    KERNEL_ASSERT(vfs_seek(file, elf.ro_location) == VFS_OK);
+    KERNEL_ASSERT(vfs_read(file, (void *)elf.ro_vaddr, elf.ro_size)
+                  == (int)elf.ro_size);
+  }
+
+  if (elf.rw_size > 0) {
+    /* Make sure that the segment is in proper place. */
+    KERNEL_ASSERT(elf.rw_vaddr >= PAGE_SIZE);
+    KERNEL_ASSERT(vfs_seek(file, elf.rw_location) == VFS_OK);
+    KERNEL_ASSERT(vfs_read(file, (void *)elf.rw_vaddr, elf.rw_size)
+                  == (int)elf.rw_size);
+  }
 
 
-    /* Set the dirty bit to zero (read-only) on read-only pages. */
-    for(i = 0; i < (int)elf.ro_pages; i++) {
-        vm_set_dirty(my_entry->pagetable, elf.ro_vaddr + i*PAGE_SIZE, 0);
-    }
+  /* Set the dirty bit to zero (read-only) on read-only pages. */
+  for(i = 0; i < (int)elf.ro_pages; i++) {
+    vm_set_dirty(my_entry->pagetable, elf.ro_vaddr + i*PAGE_SIZE, 0);
+  }
 
-    /* Insert page mappings again to TLB to take read-only bits into use */
-    intr_status = _interrupt_disable();
-    tlb_fill(my_entry->pagetable);
-    _interrupt_set_state(intr_status);
+  /* Insert page mappings again to TLB to take read-only bits into use */
+  intr_status = _interrupt_disable();
+  tlb_fill(my_entry->pagetable);
+  _interrupt_set_state(intr_status);
 
-    /* Initialize the user context. (Status register is handled by
-       thread_goto_userland) */
-    memoryset(&user_context, 0, sizeof(user_context));
-    user_context.cpu_regs[MIPS_REGISTER_SP] = USERLAND_STACK_TOP;
-    user_context.pc = elf.entry_point;
+  /* Initialize the user context. (Status register is handled by
+     thread_goto_userland) */
+  memoryset(&user_context, 0, sizeof(user_context));
+  user_context.cpu_regs[MIPS_REGISTER_SP] = USERLAND_STACK_TOP;
+  user_context.pc = elf.entry_point;
 
-    thread_goto_userland(&user_context);
+  thread_goto_userland(&user_context);
 
-    KERNEL_PANIC("thread_goto_userland failed.");
+  KERNEL_PANIC("thread_goto_userland failed.");
 }
 
 void process_init( void ) {
-  KERNEL_PANIC("Not implemented.");
+  /* ====== DEBUG START ====== */
+  DEBUG( "debug_processes", "in process_init( void )\n" );
+  /* ====== DEBUG END ====== */
+  
+  int pid;
+  /* Mark each process as free */
+  for( pid = 0; pid < PROCESS_MAX_PROCESSES; pid++ ){
+    process_table[pid].state = PROCESS_FREE;
+  }
 }
 
 process_id_t process_spawn( const char* executable ) {
@@ -213,16 +236,20 @@ int process_join( process_id_t pid ) {
 
 process_id_t process_get_current_process( void )
 {
-    return thread_get_current_thread_entry()->process_id;
+  return thread_get_current_thread_entry()->process_id; 
 }
 
 process_control_block_t* process_get_current_process_entry( void )
 {
-    return &process_table[process_get_current_process()];
+  /* ====== DEBUG START ====== */
+  DEBUG( "debug_processes", "in process_get_current_process_entry( void )\n" );
+  /* ====== DEBUG END ====== */
+
+  return &process_table[process_get_current_process()];
 }
 
 process_control_block_t* process_get_process_entry( process_id_t pid ) {
-    return &process_table[pid];
+  return &process_table[pid];
 }
 
 

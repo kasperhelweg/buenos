@@ -59,16 +59,16 @@ typedef enum {
 typedef struct {
     /* context save areas context and user_context*/
     /* for interrupts */
-    context_t *context;
+    context_t* context;
     /* for traps (syscalls), if applicable */
-    context_t *user_context;
+    context_t* user_context;
 
     /* thread state */
     thread_state_t state;
     /* which resource this thread sleeps on (0 for none) */
     uint32_t sleeps_on;
     /* pointer to this thread's pagetable */
-    pagetable_t *pagetable;
+    pagetable_t* pagetable;
 
     /* PID. Currently not used for anything, but might be useful
        if process table is implemented. */

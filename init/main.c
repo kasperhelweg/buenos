@@ -124,6 +124,12 @@ void init_startup_thread(uint32_t arg)
     kprintf("Initializing networking\n");
     network_init();
 
+     /* initialize the process table */
+    kwrite("Initializing process table\n");
+    
+    
+    
+
     if(bootargs_get("initprog") == NULL) {
 	kprintf("No initial program (initprog), dropping to fallback\n");
 	init_startup_fallback();
@@ -132,7 +138,7 @@ void init_startup_thread(uint32_t arg)
     kprintf("Starting initial program '%s'\n", bootargs_get("initprog"));
 
     process_start(bootargs_get("initprog"));
-
+    
     /* The current process_start() should never return. */
     KERNEL_PANIC("Run out of initprog.\n");
 }
@@ -213,6 +219,9 @@ void init(void)
     kwrite("Initializing virtual memory\n");
     vm_init();
 
+    kwrite("Initializing process table\n");
+    process_init( );
+   
     kprintf("Creating initialization thread\n");
     startup_thread = thread_create(&init_startup_thread, 0);
     thread_run(startup_thread);

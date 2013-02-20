@@ -37,12 +37,13 @@
 #ifndef BUENOS_PROC_PROCESS
 #define BUENOS_PROC_PROCESS
 
+/* typedefs for process */
 typedef int process_id_t;
-typedef int process_state_t;
+/* process name, currently restricted to 20 chars + escape */
+typedef char process_name_20_t[21];
 
+/* filedescriptor id type */
 typedef int filedescriptor_id_t;
-
-void process_start( const char* executable );
 
 #define USERLAND_STACK_TOP 0x7fffeffc
 
@@ -51,27 +52,42 @@ void process_start( const char* executable );
 
 #define PROCESS_MAX_PROCESSES 32
 
-/* state definitions */
-#define PROCESS_STATE_RUNNIG  1
-#define PROCESS_STATE_ZOMBIE  3
+/* state enum */
+typedef enum {
+    PROCESS_FREE,
+    PROCESS_RUNNING,
+    PROCESS_READY,
+    PROCESS_SLEEPING,
+    PROCESS_NONREADY,
+    PROCESS_DYING
+} process_state_t;;
 
+/* PCB */
 typedef struct process_control_block_t {
-  /* the process id*/
+  /* the process id and name */
   process_id_t pid;
+  process_name_20_t name;
   /* state of the process */
   process_state_t state;
   
   /* parent process stuff */
   struct process_control_block_t* parent;
-    
+  
+  /* *************** */
+  /* children( choose a datasctructure for these ) */
+  /* *************** */
+
 } process_control_block_t;
 
 /* choose a datastrucure to hold files */ 
+/* FD block */
 typedef struct process_file_descriptor_t {
   /* the filedescriptor id*/
   filedescriptor_id_t fid;
 
 } process_file_descriptor_t;
+
+void process_start( const char* executable );
 
 /* Initialize the process table.  This must be called during kernel
    startup before any other process-related calls. */
