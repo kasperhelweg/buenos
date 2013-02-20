@@ -45,11 +45,12 @@
 #include "vm/vm.h"
 #include "vm/pagepool.h"
 
-
 /** @name Process startup
  *
- * This module contains a function to start a userland process.
+ * This module contains facilities for managing userland process.
  */
+
+process_control_block_t process_table[PROCESS_MAX_PROCESSES];
 
 /**
  * Starts one userland process. The thread calling this function will
@@ -186,5 +187,43 @@ void process_start(const char *executable)
 
     KERNEL_PANIC("thread_goto_userland failed.");
 }
+
+void process_init() {
+  KERNEL_PANIC("Not implemented.");
+}
+
+process_id_t process_spawn(const char *executable) {
+  executable = executable;
+  KERNEL_PANIC("Not implemented.");
+  return 0; /* Dummy */
+}
+
+/* Stop the process and the thread it runs in. Sets the return value as well */
+void process_finish(int retval) {
+  retval=retval;
+  KERNEL_PANIC("Not implemented.");
+}
+
+int process_join(process_id_t pid) {
+  pid=pid;
+  KERNEL_PANIC("Not implemented.");
+  return 0; /* Dummy */
+}
+
+
+process_id_t process_get_current_process(void)
+{
+    return thread_get_current_thread_entry()->process_id;
+}
+
+process_control_block_t *process_get_current_process_entry(void)
+{
+    return &process_table[process_get_current_process()];
+}
+
+process_control_block_t *process_get_process_entry(process_id_t pid) {
+    return &process_table[pid];
+}
+
 
 /** @} */
