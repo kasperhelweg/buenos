@@ -64,7 +64,7 @@ process_control_block_t process_table[PROCESS_MAX_PROCESSES];
  * @executable The name of the executable to be run in the userland
  * process
  */
-void process_start(const char *executable)
+void process_start( const char* executable )
 {
     thread_table_t *my_entry;
     pagetable_t *pagetable;
@@ -78,7 +78,7 @@ void process_start(const char *executable)
 
     interrupt_status_t intr_status;
 
-    my_entry = thread_get_current_thread_entry();
+    my_entry = thread_get_current_thread_entry( );
 
     /* If the pagetable of this thread is not NULL, we are trying to
        run a userland process for a second time in the same thread.
@@ -188,40 +188,40 @@ void process_start(const char *executable)
     KERNEL_PANIC("thread_goto_userland failed.");
 }
 
-void process_init() {
+void process_init( void ) {
   KERNEL_PANIC("Not implemented.");
 }
 
-process_id_t process_spawn(const char *executable) {
+process_id_t process_spawn( const char *executable ) {
   executable = executable;
   KERNEL_PANIC("Not implemented.");
   return 0; /* Dummy */
 }
 
 /* Stop the process and the thread it runs in. Sets the return value as well */
-void process_finish(int retval) {
+void process_finish( int retval ) {
   retval=retval;
   KERNEL_PANIC("Not implemented.");
 }
 
-int process_join(process_id_t pid) {
+int process_join( process_id_t pid ) {
   pid=pid;
   KERNEL_PANIC("Not implemented.");
   return 0; /* Dummy */
 }
 
 
-process_id_t process_get_current_process(void)
+process_id_t process_get_current_process( void )
 {
     return thread_get_current_thread_entry()->process_id;
 }
 
-process_control_block_t *process_get_current_process_entry(void)
+process_control_block_t* process_get_current_process_entry( void )
 {
     return &process_table[process_get_current_process()];
 }
 
-process_control_block_t *process_get_process_entry(process_id_t pid) {
+process_control_block_t* process_get_process_entry( process_id_t pid ) {
     return &process_table[pid];
 }
 

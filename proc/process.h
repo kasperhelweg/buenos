@@ -39,7 +39,7 @@
 
 typedef int process_id_t;
 
-void process_start(const char *executable);
+void process_start( const char* executable );
 
 #define USERLAND_STACK_TOP 0x7fffeffc
 
@@ -55,23 +55,23 @@ typedef struct {
 
 /* Initialize the process table.  This must be called during kernel
    startup before any other process-related calls. */
-void process_init();
+void process_init( void );
 
 /* Run process in a new thread. Returns the PID of the new process. */
-process_id_t process_spawn(const char *executable);
+process_id_t process_spawn( const char* executable );
 
 /* Stop the process and the thread it runs in. Sets the return value as well */
-void process_finish(int retval);
+void process_finish( int retval );
 
 /* Wait for the given process to terminate, returning its return value. This
  * will also mark its process table entry as free.
  * Only works on child processes */
-int process_join(process_id_t pid);
+int process_join( process_id_t pid );
 
 /* Return PID of current process. */
-process_id_t process_get_current_process(void);
+process_id_t process_get_current_process( void );
 
 /* Return PCB of current process. */
-process_control_block_t *process_get_current_process_entry(void);
+process_control_block_t *process_get_current_process_entry( void );
 
 #endif
