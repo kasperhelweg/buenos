@@ -41,16 +41,17 @@
 #include "kernel/assert.h"
 #include "kernel/interrupt.h"
 #include "kernel/config.h"
+#include "kernel/sleepq.h"
 #include "fs/vfs.h"
 #include "drivers/yams.h"
 #include "vm/vm.h"
 #include "vm/pagepool.h"
 
-#include "kernel/sleepq.h"
-/* internal prototypes */
-
+/* process_tabel spinlock */
 static spinlock_t pt_slock;
 
+/* internal prototypes */
+process_id_t process_create( const char* executable );
 void process_wrapper( process_id_t pid );
 
 /** @name Process startup
@@ -188,7 +189,6 @@ void process_start( process_id_t pid )
                   == (int)elf.rw_size);
   }
 
-
   /* Set the dirty bit to zero (read-only) on read-only pages. */
   for(i = 0; i < (int)elf.ro_pages; i++) {
     vm_set_dirty(my_entry->pagetable, elf.ro_vaddr + i*PAGE_SIZE, 0);
@@ -214,7 +214,8 @@ void process_init( void ) {
   int pid;
   /* set the spinclok to free*/
   spinlock_reset(&pt_slock);
-  /* Mark each process as free */
+  /* mark each process as free. 
+   * no need to lock the table, since no threads are running */
   for( pid = 0; pid < PROCESS_MAX_PROCESSES; pid++ ){
     process_table[pid].state = PROCESS_FREE;
   }
@@ -248,21 +249,25 @@ void process_finish( int retval ) {
   /* DEBUG( "debug_processes", "process_finish() says ~ current_process: %s\n", process_table[process_get_current_process( )].name ); */
   /* ====== DEBUG END ====== */
   
+  thread_table_t* current_thread_entry;
+  process_id_t current_pid;
+
+  current_thread_entry = thread_get_current_thread_entry( );
+  current_pid = process_get_current_process( );
+
   _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
-  process_table[process_get_current_process( )].state = PROCESS_DYING;
-  process_table[process_get_current_process( )].return_code = retval;
-  sleepq_wake( &process_table[process_get_current_process( )] );
+  process_table[current_pid].state = PROCESS_DYING;
+  process_table[current_pid].return_code = retval;
+  sleepq_wake( &process_table[current_pid] );
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
   _interrupt_enable( );
 
-  /*
-  vm_destroy_pagetable( thr->pagetable );
-  thr->pagetable = NULL;
+  vm_destroy_pagetable( current_thread_entry->pagetable );
+  current_thread_entry->pagetable = NULL;
   thread_finish( );
-  */
 }
 
 int process_join( process_id_t pid ) {
@@ -310,7 +315,6 @@ process_id_t process_create( const char* executable )
    * the process id is always just the index into process table
    * this works kind of weel and is OK efficient
    */
-  
   _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/

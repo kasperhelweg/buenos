@@ -120,6 +120,7 @@ int main() {
   char buffer[BUFFER_SIZE];
   heap_init();
   stack_init(&stack);
+  
   while (1) {
     readline(buffer, BUFFER_SIZE);
     if (strcmp(buffer, "") == 0) {
@@ -149,6 +150,8 @@ int main() {
           out_of_memory();
         }
       }
+    } else if (strcmp(buffer, "quit") == 0) {
+      syscall_exit(2);
     } else {
       printf("Bad input.\n");
     }

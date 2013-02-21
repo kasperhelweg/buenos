@@ -4,7 +4,7 @@
 
 #include "tests/lib.h"
 
-static const char prog[] = "[root]hw"; /* The program to start. */
+static const char prog[] = "[root]calc"; /* The program to start. */
 
 int main(void)
 {
