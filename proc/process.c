@@ -65,13 +65,11 @@ process_control_block_t process_table[PROCESS_MAX_PROCESSES];
  * @executable The name of the executable to be run in the userland
  * process
  */
-void process_start( const char* executable )
+void process_start( process_id_t pid )
 {
   /* name of executable */
-  
-
+  const char* executable;
   thread_table_t* my_entry;
-  process_id_t process_id;
   pagetable_t* pagetable;
   uint32_t phys_page;
   context_t user_context;
@@ -83,21 +81,14 @@ void process_start( const char* executable )
 
   interrupt_status_t intr_status;
 
+  /* initial thread_entry setup */
   my_entry = thread_get_current_thread_entry( );
+  my_entry->process_id = pid; 
 
-  /* get and set id of process. could be cleaner
-   * the process id is always just the index into process table
-   * this works kind of weel and is OK efficient
-   */
-  process_id = 0;
-  while( process_table[process_id].state != PROCESS_FREE && process_id < PROCESS_MAX_PROCESSES ) { process_id++; }
+  /* set executable name */
+  executable = process_table[pid].name;
   
-  if( process_table[process_id].state == PROCESS_FREE ) { 
-    my_entry->process_id = process_id; 
-  } else { 
-    /* do something */ 
-  }
-
+  
   /* If the pagetable of this thread is not NULL, we are trying to
      run a userland process for a second time in the same thread.
      This is not possible. */
@@ -110,7 +101,7 @@ void process_start( const char* executable )
   my_entry->pagetable = pagetable;
   _interrupt_set_state(intr_status);
 
-  file = vfs_open((char *)executable);
+  file = vfs_open((char*)executable);
   /* Make sure the file existed and was a valid ELF file */
   KERNEL_ASSERT(file >= 0);
   KERNEL_ASSERT(elf_parse_header(&elf, file));
@@ -195,12 +186,6 @@ void process_start( const char* executable )
   tlb_fill(my_entry->pagetable);
   _interrupt_set_state(intr_status);
 
-  /* set entries in PCB. 
-   * Don't know if this should be here or moved to the process_id loop 
-   */
-  process_table[process_id].pid = process_id;
-  process_table[process_id].state = PROCESS_READY;
-  
   /* Initialize the user context. (Status register is handled by
      thread_goto_userland) */
   memoryset(&user_context, 0, sizeof(user_context));
@@ -225,9 +210,31 @@ void process_init( void ) {
 }
 
 process_id_t process_spawn( const char* executable ) {
-  executable = executable;
-  KERNEL_PANIC("Not implemented.");
-  return 0; /* Dummy */
+  /* process id */
+  process_id_t pid;
+  pid = 0;
+  /* get and set id of process. could be cleaner
+   * the process id is always just the index into process table
+   * this works kind of weel and is OK efficient
+   */
+  
+  while( process_table[pid].state != PROCESS_FREE && pid < PROCESS_MAX_PROCESSES ) { pid++; }
+  
+  if( process_table[pid].state == PROCESS_FREE ) { 
+    /* set entries in PCB. 
+     * Don't know if this should be here yet...guess it's cool.
+     */
+    process_table[pid].pid = pid;
+    process_table[pid].state = PROCESS_READY;
+    process_table[pid].name = executable;
+        
+    process_start( pid );
+  } else { 
+    /* do something */
+    pid = -1;
+  }
+
+  return pid; 
 }
 
 /* Stop the process and the thread it runs in. Sets the return value as well */

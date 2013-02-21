@@ -35,6 +35,7 @@
  */
 #include "kernel/cswitch.h"
 #include "proc/syscall.h"
+#include "proc/process.h"
 #include "kernel/halt.h"
 #include "kernel/panic.h"
 #include "lib/libc.h"
@@ -201,8 +202,8 @@ int syscall_write( int filehandle, const void* buffer, int length )
 
 int syscall_exec(const char* filename)
 {
-  filename = filename;
-  return 0;
+  /* maybe do some checks and stuff */
+  return process_spawn( filename );
 }
 
 void syscall_exit(int retval)

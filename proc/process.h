@@ -40,7 +40,7 @@
 /* typedefs for process */
 typedef int process_id_t;
 /* process name, currently restricted to 20 chars + escape */
-typedef char process_name_20_t[21];
+typedef const char* process_name_t;
 
 /* filedescriptor id type */
 typedef int filedescriptor_id_t;
@@ -67,7 +67,7 @@ typedef enum {
 typedef struct process_control_block_t {
   /* the process id and name */
   process_id_t pid;
-  process_name_20_t name;
+  process_name_t name;
   /* state of the process */
   process_state_t state;
   
@@ -88,7 +88,7 @@ typedef struct process_file_descriptor_t {
 
 } process_file_descriptor_t;
 
-void process_start( const char* executable );
+void process_start( process_id_t pid );
 
 /* Initialize the process table.  This must be called during kernel
    startup before any other process-related calls. */
