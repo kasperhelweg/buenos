@@ -67,6 +67,9 @@ process_control_block_t process_table[PROCESS_MAX_PROCESSES];
  */
 void process_start( const char* executable )
 {
+  /* name of executable */
+  
+
   thread_table_t* my_entry;
   process_id_t process_id;
   pagetable_t* pagetable;

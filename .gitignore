@@ -22,6 +22,7 @@
 
 # Maps 
 *.map
+*.map.*
 
 # Specific exec's
 buenos
@@ -30,3 +31,6 @@ tfstool
 # Userland exec's
 halt
 readwrite
+calc
+exec
+hw

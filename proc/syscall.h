@@ -34,6 +34,8 @@
  *
  */
 
+
+
 #ifndef BUENOS_PROC_SYSCALL
 #define BUENOS_PROC_SYSCALL
 
@@ -60,15 +62,6 @@
 #define FILEHANDLE_STDIN 0
 #define FILEHANDLE_STDOUT 1
 #define FILEHANDLE_STDERR 2
-
-/* IO related syscalls */
-int syscall_read( int filehandle, void* buffer, int length );
-int syscall_write( int filehandle, const void* buffer, int length );
-
-/* process related syscalls */
-int syscall_exec(const char *filename);
-void syscall_exit(int retval);
-int syscall_join(int pid);
 
 
 #endif

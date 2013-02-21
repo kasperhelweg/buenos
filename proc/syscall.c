@@ -45,6 +45,16 @@
 #include "drivers/device.h"
 #include "drivers/gcd.h"
 
+/* IO related syscalls */
+int syscall_read( int filehandle, void* buffer, int length );
+int syscall_write( int filehandle, const void* buffer, int length );
+
+/* process related syscalls */
+int syscall_exec(const char *filename);
+void syscall_exit(int retval);
+int syscall_join(int pid);
+
+
 /**
  * Handle system calls. Interrupts are enabled when this function is
  * called.
@@ -93,10 +103,21 @@ void syscall_handle(context_t *user_context)
                     );
     break;
   case SYSCALL_EXEC:
+    user_context->cpu_regs[MIPS_REGISTER_V0] = 
+      syscall_exec(
+                   (const char*)user_context->cpu_regs[MIPS_REGISTER_A1]
+                   );
     break;
   case SYSCALL_EXIT:
+    syscall_join(
+                 user_context->cpu_regs[MIPS_REGISTER_A1]
+                 );
     break;
   case SYSCALL_JOIN:
+    user_context->cpu_regs[MIPS_REGISTER_V0] = 
+      syscall_join(
+                   user_context->cpu_regs[MIPS_REGISTER_A1]
+                   );
     break;
   default: 
     KERNEL_PANIC( "Unhandled system call\n" );
