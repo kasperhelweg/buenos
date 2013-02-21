@@ -33,6 +33,8 @@
  * $Id: syscall.c,v 1.3 2004/01/13 11:10:05 ttakanen Exp $
  *
  */
+#include "lib/debug.h"
+
 #include "kernel/cswitch.h"
 #include "proc/syscall.h"
 #include "proc/process.h"
@@ -41,8 +43,6 @@
 #include "lib/libc.h"
 #include "kernel/assert.h"
 
-#include "lib/debug.h"
-
 #include "drivers/device.h"
 #include "drivers/gcd.h"
 
@@ -50,10 +50,6 @@
 int syscall_read( int filehandle, void* buffer, int length );
 int syscall_write( int filehandle, const void* buffer, int length );
 
-/* process related syscalls */
-int syscall_exec(const char *filename);
-void syscall_exit(int retval);
-int syscall_join(int pid);
 
 
 /**
@@ -105,20 +101,14 @@ void syscall_handle(context_t *user_context)
     break;
   case SYSCALL_EXEC:
     user_context->cpu_regs[MIPS_REGISTER_V0] = 
-      syscall_exec(
-                   (const char*)user_context->cpu_regs[MIPS_REGISTER_A1]
-                   );
+      process_spawn( (const char*)user_context->cpu_regs[MIPS_REGISTER_A1] );
     break;
   case SYSCALL_EXIT:
-    syscall_join(
-                 user_context->cpu_regs[MIPS_REGISTER_A1]
-                 );
+    process_finish( user_context->cpu_regs[MIPS_REGISTER_A1] );
     break;
   case SYSCALL_JOIN:
-    user_context->cpu_regs[MIPS_REGISTER_V0] = 
-      syscall_join(
-                   user_context->cpu_regs[MIPS_REGISTER_A1]
-                   );
+    user_context->cpu_regs[MIPS_REGISTER_V0] =
+      process_join( user_context->cpu_regs[MIPS_REGISTER_A1] );
     break;
   default: 
     KERNEL_PANIC( "Unhandled system call\n" );
@@ -199,20 +189,3 @@ int syscall_write( int filehandle, const void* buffer, int length )
   return gcd->write( gcd, buffer, length );
 }
 
-
-int syscall_exec(const char* filename)
-{
-  /* maybe do some checks and stuff */
-  return process_spawn( filename );
-}
-
-void syscall_exit(int retval)
-{
-  retval = retval;
-}
-
-int syscall_join(int pid)
-{
-  pid = pid;
-  return 0;
-}

@@ -33,6 +33,7 @@
  * $Id: process.c,v 1.11 2007/03/07 18:12:00 ttakanen Exp $
  *
  */
+#include "lib/debug.h"
 
 #include "proc/process.h"
 #include "proc/elf.h"
@@ -45,7 +46,13 @@
 #include "vm/vm.h"
 #include "vm/pagepool.h"
 
-#include "lib/debug.h"
+#include "kernel/sleepq.h"
+/* internal prototypes */
+
+static spinlock_t pt_slock;
+
+void process_wrapper( process_id_t pid );
+
 /** @name Process startup
  *
  * This module contains facilities for managing userland process.
@@ -89,7 +96,9 @@ void process_start( process_id_t pid )
   executable = process_table[pid].name;
   
   /* ====== DEBUG START ====== */
-  DEBUG( "debug_processes", "exec name: %s\n", executable );
+  DEBUG( "debug_processes", "process_start() says ~ executable name: %s\n", executable );
+  DEBUG( "debug_processes", "process_start() says ~ tid: %d\n", thread_get_current_thread( ) );
+  DEBUG( "debug_processes", "process_start() says ~ pid: %d\n", pid );
   /* ====== DEBUG END ====== */
 
   /* If the pagetable of this thread is not NULL, we are trying to
@@ -104,9 +113,6 @@ void process_start( process_id_t pid )
   my_entry->pagetable = pagetable;
   _interrupt_set_state(intr_status);
 
-  /* ====== DEBUG START ====== */
-  DEBUG( "debug_processes", "opening file\n" );
-  /* ====== DEBUG END ====== */
   file = vfs_open((char*)executable);
   
   /* Make sure the file existed and was a valid ELF file */
@@ -205,11 +211,9 @@ void process_start( process_id_t pid )
 }
 
 void process_init( void ) {
-  /* ====== DEBUG START ====== */
-  DEBUG( "debug_processes", "in process_init( void )\n" );
-  /* ====== DEBUG END ====== */
-  
   int pid;
+  /* set the spinclok to free*/
+  spinlock_reset(&pt_slock);
   /* Mark each process as free */
   for( pid = 0; pid < PROCESS_MAX_PROCESSES; pid++ ){
     process_table[pid].state = PROCESS_FREE;
@@ -217,49 +221,63 @@ void process_init( void ) {
 }
 
 process_id_t process_spawn( const char* executable ) {
-  
   /* ====== DEBUG START ====== */
-  DEBUG( "debug_processes", "exec name: %s\n", executable );
+  DEBUG( "debug_processes", "process_spawn() says ~ executable name: %s\n", executable );
   /* ====== DEBUG END ====== */
 
   /* process id */
-  process_id_t pid;
-  pid = 0;
-  /* get and set id of process. could be cleaner
-   * the process id is always just the index into process table
-   * this works kind of weel and is OK efficient
-   */
-  
-  while( process_table[pid].state != PROCESS_FREE && pid < PROCESS_MAX_PROCESSES ) { pid++; }  
-  if( process_table[pid].state == PROCESS_FREE ) { 
-    /* set entries in PCB. 
-     * Don't know if this should be here yet...guess it's cool.
-     */
-    process_table[pid].pid = pid;
-    process_table[pid].state = PROCESS_READY;
-    process_table[pid].name = executable;
-        
-    process_start( pid );
-  } else { 
-    /* do something */
-    pid = -1;
+  process_id_t child_pid;
+  TID_t child_tid;
+    
+  /* create a new process entry*/
+  child_pid = process_create( executable );
+  if( child_pid != -1 ){
+    /* create a new thread and run it if process creation was succesfull */
+    child_tid = thread_create((void (*)(uint32_t))&process_wrapper, (uint32_t)child_pid);
+    process_table[child_pid].tid = child_tid;
+    process_table[child_pid].state = PROCESS_RUNNING;
+    process_table[child_pid].parent = &process_table[process_get_current_process()];
+    thread_run( child_tid );
   }
-
-  return pid; 
+  return child_pid; 
 }
 
 /* Stop the process and the thread it runs in. Sets the return value as well */
 void process_finish( int retval ) {
+  /* ====== DEBUG START ====== */
+  DEBUG( "debug_processes", "process_finish() says ~ current_process: %s\n", process_table[process_get_current_process( )].name );
+  /* ====== DEBUG END ====== */
+  
+  _interrupt_disable( );
+  spinlock_acquire( &pt_slock );  
+    
+  process_table[process_get_current_process( )].state = PROCESS_DYING;
+  sleepq_wake( &process_table[process_get_current_process( )] );
+  
+  spinlock_release( &pt_slock );  
+  _interrupt_enable( );
+  
+  
+
   retval=retval;
-  KERNEL_PANIC("Not implemented.");
+  
 }
 
 int process_join( process_id_t pid ) {
-  pid=pid;
-  KERNEL_PANIC("Not implemented.");
-  return 0; /* Dummy */
-}
 
+  _interrupt_disable( );
+  spinlock_acquire( &pt_slock );  
+  while( process_table[pid].state != PROCESS_DYING ){
+    sleepq_add( &process_table[pid] );
+    spinlock_release( &pt_slock );
+    thread_switch( );
+    spinlock_acquire( &pt_slock );  
+  } 
+  spinlock_release( &pt_slock );  
+  _interrupt_enable( );
+  
+  return 0;
+}
 
 process_id_t process_get_current_process( void )
 {
@@ -268,10 +286,6 @@ process_id_t process_get_current_process( void )
 
 process_control_block_t* process_get_current_process_entry( void )
 {
-  /* ====== DEBUG START ====== */
-  DEBUG( "debug_processes", "in process_get_current_process_entry( void )\n" );
-  /* ====== DEBUG END ====== */
-
   return &process_table[process_get_current_process()];
 }
 
@@ -279,5 +293,39 @@ process_control_block_t* process_get_process_entry( process_id_t pid ) {
   return &process_table[pid];
 }
 
+/* AUX */
+process_id_t process_create( const char* executable ) 
+{
+  process_id_t pid;
+  pid = 0;
+  
+  /* get and set id of process. could be cleaner
+   * the process id is always just the index into process table
+   * this works kind of weel and is OK efficient
+   */
+  while( process_table[pid].state != PROCESS_FREE && pid < PROCESS_MAX_PROCESSES ) { pid++; }  
+  if( process_table[pid].state == PROCESS_FREE ) { 
+    /* set entries in PCB. 
+     * Don't know if this should be here yet...guess it's cool.
+     */
+    process_table[pid].pid = pid;
+    process_table[pid].state = PROCESS_READY;
+    process_table[pid].name = executable;
+    
+  } else { 
+    /* do something */
+    pid = -1;
+  }
+  return pid;
+}
 
+/* this function is used to */
+void process_wrapper( process_id_t pid )
+{
+  process_start( pid );
+  DEBUG( "debug_processes", "process_wrapper process_start returned\n" );
+}
+
+
+ 
 /** @} */

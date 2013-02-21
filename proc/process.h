@@ -39,6 +39,7 @@
 
 /* typedefs for process */
 typedef int process_id_t;
+typedef int thread_id_t;
 /* process name, currently restricted to 20 chars + escape */
 typedef const char* process_name_t;
 
@@ -68,6 +69,8 @@ typedef struct process_control_block_t {
   /* the process id and name */
   process_id_t pid;
   process_name_t name;
+  /* thread */
+  thread_id_t tid;
   /* state of the process */
   process_state_t state;
   
@@ -93,6 +96,8 @@ void process_start( process_id_t pid );
 /* Initialize the process table.  This must be called during kernel
    startup before any other process-related calls. */
 void process_init( void );
+
+process_id_t process_create( const char* executable );
 
 /* Run process in a new thread. Returns the PID of the new process. */
 process_id_t process_spawn( const char* executable );

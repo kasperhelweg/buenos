@@ -33,6 +33,7 @@
  * $Id: thread.c,v 1.22 2004/01/12 09:12:22 ttakanen Exp $
  *
  */
+#include "lib/debug.h"
 
 #include "lib/libc.h"
 #include "kernel/spinlock.h"
@@ -120,6 +121,10 @@ void thread_table_init(void)
  */
 TID_t thread_create(void (*func)(uint32_t), uint32_t arg)
 {
+  /* ====== DEBUG START ====== */
+  DEBUG( "debug_processes", "CREATING THREAD\n");
+  /* ====== DEBUG END ====== */
+
     static TID_t next_tid = 0;
     TID_t i, tid = -1;
 
