@@ -28,9 +28,14 @@
 buenos
 tfstool
 
+# Doc
+doc/
+
 # Userland exec's
 halt
 readwrite
 calc
 exec
 hw
+
+
