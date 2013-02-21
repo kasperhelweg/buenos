@@ -245,7 +245,7 @@ process_id_t process_spawn( const char* executable ) {
 /* Stop the process and the thread it runs in. Sets the return value as well */
 void process_finish( int retval ) {
   /* ====== DEBUG START ====== */
-  DEBUG( "debug_processes", "process_finish() says ~ current_process: %s\n", process_table[process_get_current_process( )].name );
+  /* DEBUG( "debug_processes", "process_finish() says ~ current_process: %s\n", process_table[process_get_current_process( )].name ); */
   /* ====== DEBUG END ====== */
   
   _interrupt_disable( );
@@ -257,26 +257,25 @@ void process_finish( int retval ) {
   spinlock_release( &pt_slock );  
   _interrupt_enable( );
   
-  
-
   retval=retval;
-  
 }
 
 int process_join( process_id_t pid ) {
 
   _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
+  
   while( process_table[pid].state != PROCESS_DYING ){
     sleepq_add( &process_table[pid] );
     spinlock_release( &pt_slock );
     thread_switch( );
     spinlock_acquire( &pt_slock );  
   } 
+  
   spinlock_release( &pt_slock );  
   _interrupt_enable( );
   
-  return 0;
+  return 100;
 }
 
 process_id_t process_get_current_process( void )
