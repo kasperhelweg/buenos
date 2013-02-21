@@ -77,6 +77,7 @@ typedef struct process_control_block_t {
   /* parent process stuff */
   struct process_control_block_t* parent;
   
+  int return_code;
   /* *************** */
   /* children( choose a datasctructure for these ) */
   /* *************** */

@@ -252,16 +252,25 @@ void process_finish( int retval ) {
   spinlock_acquire( &pt_slock );  
     
   process_table[process_get_current_process( )].state = PROCESS_DYING;
+  process_table[process_get_current_process( )].return_code = retval;
   sleepq_wake( &process_table[process_get_current_process( )] );
   
   spinlock_release( &pt_slock );  
   _interrupt_enable( );
+
+  /*
+  vm_destroy_pagetable( thr->pagetable );
+  thr->pagetable = NULL;
+  thread_finish( );
+  */
   
   retval=retval;
 }
 
 int process_join( process_id_t pid ) {
 
+  int retval;
+  
   _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   
@@ -272,10 +281,11 @@ int process_join( process_id_t pid ) {
     spinlock_acquire( &pt_slock );  
   } 
   
+  retval = process_table[pid].return_code;
   spinlock_release( &pt_slock );  
   _interrupt_enable( );
   
-  return 100;
+  return retval; /* return childs exit code*/
 }
 
 process_id_t process_get_current_process( void )
