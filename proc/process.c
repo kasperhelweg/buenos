@@ -88,7 +88,10 @@ void process_start( process_id_t pid )
   /* set executable name */
   executable = process_table[pid].name;
   
-  
+  /* ====== DEBUG START ====== */
+  DEBUG( "debug_processes", "exec name: %s\n", executable );
+  /* ====== DEBUG END ====== */
+
   /* If the pagetable of this thread is not NULL, we are trying to
      run a userland process for a second time in the same thread.
      This is not possible. */
@@ -101,7 +104,11 @@ void process_start( process_id_t pid )
   my_entry->pagetable = pagetable;
   _interrupt_set_state(intr_status);
 
+  /* ====== DEBUG START ====== */
+  DEBUG( "debug_processes", "opening file\n" );
+  /* ====== DEBUG END ====== */
   file = vfs_open((char*)executable);
+  
   /* Make sure the file existed and was a valid ELF file */
   KERNEL_ASSERT(file >= 0);
   KERNEL_ASSERT(elf_parse_header(&elf, file));
@@ -210,6 +217,11 @@ void process_init( void ) {
 }
 
 process_id_t process_spawn( const char* executable ) {
+  
+  /* ====== DEBUG START ====== */
+  DEBUG( "debug_processes", "exec name: %s\n", executable );
+  /* ====== DEBUG END ====== */
+
   /* process id */
   process_id_t pid;
   pid = 0;
@@ -218,8 +230,7 @@ process_id_t process_spawn( const char* executable ) {
    * this works kind of weel and is OK efficient
    */
   
-  while( process_table[pid].state != PROCESS_FREE && pid < PROCESS_MAX_PROCESSES ) { pid++; }
-  
+  while( process_table[pid].state != PROCESS_FREE && pid < PROCESS_MAX_PROCESSES ) { pid++; }  
   if( process_table[pid].state == PROCESS_FREE ) { 
     /* set entries in PCB. 
      * Don't know if this should be here yet...guess it's cool.
