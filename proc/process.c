@@ -250,11 +250,11 @@ void process_finish( int retval ) {
   
   _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
-    
+  /*==========LOCKED==========*/
   process_table[process_get_current_process( )].state = PROCESS_DYING;
   process_table[process_get_current_process( )].return_code = retval;
   sleepq_wake( &process_table[process_get_current_process( )] );
-  
+  /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
   _interrupt_enable( );
 
@@ -273,15 +273,15 @@ int process_join( process_id_t pid ) {
   
   _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
-  
+  /*==========LOCKED==========*/
   while( process_table[pid].state != PROCESS_DYING ){
     sleepq_add( &process_table[pid] );
     spinlock_release( &pt_slock );
     thread_switch( );
     spinlock_acquire( &pt_slock );  
   } 
-  
   retval = process_table[pid].return_code;
+  /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
   _interrupt_enable( );
   
@@ -312,6 +312,10 @@ process_id_t process_create( const char* executable )
    * the process id is always just the index into process table
    * this works kind of weel and is OK efficient
    */
+  
+  _interrupt_disable( );
+  spinlock_acquire( &pt_slock );  
+  /*==========LOCKED==========*/
   while( process_table[pid].state != PROCESS_FREE && pid < PROCESS_MAX_PROCESSES ) { pid++; }  
   if( process_table[pid].state == PROCESS_FREE ) { 
     /* set entries in PCB. 
@@ -325,6 +329,10 @@ process_id_t process_create( const char* executable )
     /* do something */
     pid = -1;
   }
+  /*==========LOCKED==========*/
+  spinlock_release( &pt_slock );  
+  _interrupt_enable( );
+  
   return pid;
 }
 
