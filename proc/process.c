@@ -263,8 +263,6 @@ void process_finish( int retval ) {
   thr->pagetable = NULL;
   thread_finish( );
   */
-  
-  retval=retval;
 }
 
 int process_join( process_id_t pid ) {

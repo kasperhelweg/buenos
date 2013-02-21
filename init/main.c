@@ -114,6 +114,7 @@ void init_startup_fallback(void) {
 
 void init_startup_thread(uint32_t arg)
 {
+  int p;
   /* Threads have arguments for functions they run, we don't
      need any. Silence the compiler warning by using the argument. */
   arg = arg;
@@ -124,9 +125,6 @@ void init_startup_thread(uint32_t arg)
   kprintf("Initializing networking\n");
   network_init();
   
-  /* initialize the process table */
-  kwrite("Initializing process table\n");
-  
   if(bootargs_get("initprog") == NULL) {
     kprintf("No initial program (initprog), dropping to fallback\n");
     init_startup_fallback();
@@ -135,7 +133,8 @@ void init_startup_thread(uint32_t arg)
   kprintf("Starting initial program '%s'\n", bootargs_get("initprog"));
   
   /* process_start(bootargs_get("initprog")); */
-  process_start( process_create( bootargs_get( "initprog" ) ) );
+  p = process_create( bootargs_get( "initprog" ) );
+  process_start( p );
     
   /* The current process_start() should never return. */
   KERNEL_PANIC("Run out of initprog.\n");
