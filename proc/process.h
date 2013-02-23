@@ -60,7 +60,7 @@ typedef enum {
     PROCESS_READY,
     PROCESS_SLEEPING,
     PROCESS_NONREADY,
-    PROCESS_DYING,
+    PROCESS_DEAD,
     PROCESS_ZOMBIE
 } process_state_t;;
 

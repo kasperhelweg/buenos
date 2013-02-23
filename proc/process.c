@@ -295,7 +295,7 @@ void process_finish( int retval )
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
   current_process->return_code = retval;
-  current_process->state = PROCESS_DYING;
+  current_process->state = PROCESS_ZOMBIE;
   sleepq_wake( current_process );
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
@@ -312,22 +312,26 @@ int process_join( process_id_t pid )
   int retval;
   process_control_block_t* current_process;
   process_control_block_t* join_process;
+
+  /* get current and join processes */
   current_process = &process_table[process_get_current_process( )];
   join_process = &process_table[pid];
-  
+
   _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
-  current_process->state = PROCESS_SLEEPING;
-  while( join_process->state != PROCESS_DYING ){
+  while( join_process->state != PROCESS_ZOMBIE ){
     sleepq_add( join_process );
+    current_process->state = PROCESS_SLEEPING;
     spinlock_release( &pt_slock );
     thread_switch( );
     spinlock_acquire( &pt_slock );  
   } 
+  /* get return value */
   retval = join_process->return_code;
+  /* mark current process as RUNNING and */
   current_process->state = PROCESS_RUNNING;
-  join_process->state = PROCESS_ZOMBIE;
+  join_process->state = PROCESS_DEAD;
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
   _interrupt_enable( );
@@ -353,22 +357,22 @@ process_control_block_t* process_get_process_entry( process_id_t pid ) {
 process_id_t process_get_free_table_slot( void ) 
 {
   process_id_t pid;
-  process_id_t first_zombie_pid;
+  process_id_t first_dead_pid;
   pid = 1;
-  first_zombie_pid = -1;
+  first_dead_pid = -1;
  
   _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
   /* search table for a FREE slot. keep track of DYING slot.*/
   while( process_table[pid].state != PROCESS_FREE && pid < PROCESS_MAX_PROCESSES ) { 
-    if( process_table[pid].state == PROCESS_ZOMBIE && first_zombie_pid == -1 ) { 
-      first_zombie_pid = pid;
+    if( process_table[pid].state == PROCESS_DEAD && first_dead_pid == -1 ) { 
+      first_dead_pid = pid;
     }
     pid++; 
   } 
   /* no free slot found. try dying */
-  if( process_table[pid].state != PROCESS_FREE ) { pid = first_zombie_pid; } 
+  if( process_table[pid].state != PROCESS_FREE ) { pid = first_dead_pid; } 
   if( pid != -1 ) { process_table[pid].state = PROCESS_NONREADY; }
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
