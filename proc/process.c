@@ -236,19 +236,13 @@ void process_init_process( const char* executable )
 {  
   process_control_block_t* init_process;
   
-  _interrupt_disable( );
-  spinlock_acquire( &pt_slock );  
-  /*==========LOCKED==========*/
   init_process = &process_table[0];
   /* this can only be called from startup_thread */
   if( init_process->state == PROCESS_FREE && thread_get_current_thread( ) == 1 ) { 
-    /* set entries in PCB. */
+    /* set entries in PCB. no need to lock the table. */
     init_process->tid = 1;     
     init_process->name = executable;
     init_process->state = PROCESS_READY;
-    /*==========LOCKED==========*/
-    spinlock_release( &pt_slock );  
-    _interrupt_enable( );
   } else { 
     KERNEL_PANIC("Create initial process failed!");
   }
@@ -257,28 +251,26 @@ void process_init_process( const char* executable )
 
 process_id_t process_spawn( const char* executable ) 
 {  
-  process_control_block_t* process;
+  process_control_block_t* current_process;
+  process_control_block_t* child_process;
   process_id_t child_pid;
   TID_t child_tid;
     
+  /* get the current process */
+  current_process = &process_table[process_get_current_process()];
   /* get free slot in process_table */
   child_pid = process_get_free_table_slot( );
   if( child_pid != -1 ){
     /* create a new thread and run it if process creation was succesfull */
-    process = &process_table[child_pid];
+    child_process = &process_table[child_pid];
     child_tid = thread_create((void (*)(uint32_t))&process_wrapper, (uint32_t)child_pid);
+    /* no need to lock the table */
+    child_process->tid = child_tid;
+    child_process->name = executable;
+    child_process->parent = current_process;
+    child_process->state = PROCESS_READY;
 
-    _interrupt_disable( );
-    spinlock_acquire( &pt_slock );  
-    /*==========LOCKED==========*/
-    process->tid = child_tid;
-    process->name = executable;
-    process->state = PROCESS_READY;
-    process->parent = &process_table[process_get_current_process()];
-    /*==========LOCKED==========*/
-    spinlock_release( &pt_slock );  
-    _interrupt_enable( );
-
+    current_process->child = child_process;
     thread_run( child_tid );
   } else {
     /* do stuff. no more processes alloud*/
@@ -302,8 +294,8 @@ void process_finish( int retval )
   _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
-  current_process->state = PROCESS_DYING;
   current_process->return_code = retval;
+  current_process->state = PROCESS_DYING;
   sleepq_wake( current_process );
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
@@ -318,19 +310,24 @@ void process_finish( int retval )
 int process_join( process_id_t pid ) 
 {
   int retval;
-  process_control_block_t* process;
-  process = &process_table[pid];
+  process_control_block_t* current_process;
+  process_control_block_t* join_process;
+  current_process = &process_table[process_get_current_process( )];
+  join_process = &process_table[pid];
   
   _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
-  while( process->state != PROCESS_DYING ){
-    sleepq_add( process );
+  current_process->state = PROCESS_SLEEPING;
+  while( join_process->state != PROCESS_DYING ){
+    sleepq_add( join_process );
     spinlock_release( &pt_slock );
     thread_switch( );
     spinlock_acquire( &pt_slock );  
   } 
-  retval = process->return_code;
+  retval = join_process->return_code;
+  current_process->state = PROCESS_RUNNING;
+  join_process->state = PROCESS_ZOMBIE;
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
   _interrupt_enable( );
@@ -356,22 +353,23 @@ process_control_block_t* process_get_process_entry( process_id_t pid ) {
 process_id_t process_get_free_table_slot( void ) 
 {
   process_id_t pid;
-  process_id_t dying_pid;
+  process_id_t first_zombie_pid;
   pid = 1;
-  dying_pid = -1;
+  first_zombie_pid = -1;
  
   _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
   /* search table for a FREE slot. keep track of DYING slot.*/
   while( process_table[pid].state != PROCESS_FREE && pid < PROCESS_MAX_PROCESSES ) { 
-    if( process_table[pid].state == PROCESS_DYING && dying_pid == -1 ) { 
-      dying_pid = pid;
+    if( process_table[pid].state == PROCESS_ZOMBIE && first_zombie_pid == -1 ) { 
+      first_zombie_pid = pid;
     }
     pid++; 
   } 
   /* no free slot found. try dying */
-  if( process_table[pid].state != PROCESS_FREE ) { pid = dying_pid; } 
+  if( process_table[pid].state != PROCESS_FREE ) { pid = first_zombie_pid; } 
+  if( pid != -1 ) { process_table[pid].state = PROCESS_NONREADY; }
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
   _interrupt_enable( );

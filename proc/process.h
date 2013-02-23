@@ -66,22 +66,21 @@ typedef enum {
 
 /* PCB */
 typedef struct process_control_block_t {
-  /* the process id and name */
   process_id_t pid;
-  process_name_t name;
-  /* thread */
   thread_id_t tid;
-  /* state of the process */
+  process_name_t name;
   process_state_t state;
+  int return_code;
   
   /* parent process stuff */
   struct process_control_block_t* parent;
   
-  int return_code;
   /* *************** */
   /* children( choose a datasctructure for these ) */
+  /* for now a single child is allowed */
   /* *************** */
-
+  struct process_control_block_t* child;
+  
 } process_control_block_t;
 
 /* choose a datastrucure to hold files */ 
