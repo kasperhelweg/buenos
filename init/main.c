@@ -114,7 +114,6 @@ void init_startup_fallback(void) {
 
 void init_startup_thread(uint32_t arg)
 {
-  int p;
   /* Threads have arguments for functions they run, we don't
      need any. Silence the compiler warning by using the argument. */
   arg = arg;
@@ -133,8 +132,7 @@ void init_startup_thread(uint32_t arg)
   kprintf("Starting initial program '%s'\n", bootargs_get("initprog"));
   
   /* process_start(bootargs_get("initprog")); */
-  p = process_create( bootargs_get( "initprog" ) );
-  process_start( p );
+  process_init_process( bootargs_get( "initprog" ) );
     
   /* The current process_start() should never return. */
   KERNEL_PANIC("Run out of initprog.\n");
@@ -198,6 +196,9 @@ void init(void)
   kwrite("Initializing threading system\n");
   thread_table_init();
 
+  kwrite("Initializing process table\n");
+  process_init( );
+
   kwrite("Initializing sleep queue\n");
   sleepq_init();
 
@@ -215,9 +216,6 @@ void init(void)
 
   kwrite("Initializing virtual memory\n");
   vm_init();
-
-  kwrite("Initializing process table\n");
-  process_init( );
    
   kprintf("Creating initialization thread\n");
   

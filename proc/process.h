@@ -92,13 +92,15 @@ typedef struct process_file_descriptor_t {
 
 } process_file_descriptor_t;
 
-void process_start( process_id_t pid );
 
 /* Initialize the process table.  This must be called during kernel
    startup before any other process-related calls. */
 void process_init( void );
 
-process_id_t process_create( const char* executable );
+/* Create and run initial process */
+void process_init_process( const char* executable );
+
+void process_start( process_id_t pid );
 
 /* Run process in a new thread. Returns the PID of the new process. */
 process_id_t process_spawn( const char* executable );

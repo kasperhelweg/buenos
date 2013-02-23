@@ -51,7 +51,7 @@
 static spinlock_t pt_slock;
 
 /* internal prototypes */
-process_id_t process_create( const char* executable );
+process_id_t process_get_free_table_slot( void );
 void process_wrapper( process_id_t pid );
 
 /** @name Process startup
@@ -205,85 +205,132 @@ void process_start( process_id_t pid )
   user_context.cpu_regs[MIPS_REGISTER_SP] = USERLAND_STACK_TOP;
   user_context.pc = elf.entry_point;
 
+  _interrupt_disable( );
+  spinlock_acquire( &pt_slock );  
+  /*==========LOCKED==========*/
+  process_table[pid].state = PROCESS_RUNNING;
+  /*==========LOCKED==========*/
+  spinlock_release( &pt_slock );  
+  _interrupt_enable( );
+
   thread_goto_userland(&user_context);
 
   KERNEL_PANIC("thread_goto_userland failed.");
 }
 
-void process_init( void ) {
+void process_init( void ) 
+{
   int pid;
   /* set the spinclok to free*/
   spinlock_reset(&pt_slock);
   /* mark each process as free. 
    * no need to lock the table, since no threads are running */
   for( pid = 0; pid < PROCESS_MAX_PROCESSES; pid++ ){
+    process_table[pid].pid = pid;
     process_table[pid].state = PROCESS_FREE;
+    process_table[pid].parent = NULL;
   }
 }
 
-process_id_t process_spawn( const char* executable ) {
-  /* ====== DEBUG START ====== */
-  DEBUG( "debug_processes", "process_spawn() says ~ executable name: %s\n", executable );
-  /* ====== DEBUG END ====== */
+void process_init_process( const char* executable ) 
+{  
+  process_control_block_t* init_process;
+  
+  _interrupt_disable( );
+  spinlock_acquire( &pt_slock );  
+  /*==========LOCKED==========*/
+  init_process = &process_table[0];
+  /* this can only be called from startup_thread */
+  if( init_process->state == PROCESS_FREE && thread_get_current_thread( ) == 1 ) { 
+    /* set entries in PCB. */
+    init_process->tid = 1;     
+    init_process->name = executable;
+    init_process->state = PROCESS_READY;
+    /*==========LOCKED==========*/
+    spinlock_release( &pt_slock );  
+    _interrupt_enable( );
+  } else { 
+    KERNEL_PANIC("Create initial process failed!");
+  }
+  process_start( 0 );
+}
 
-  /* process id */
+process_id_t process_spawn( const char* executable ) 
+{  
+  process_control_block_t* process;
   process_id_t child_pid;
   TID_t child_tid;
     
-  /* create a new process entry*/
-  child_pid = process_create( executable );
+  /* get free slot in process_table */
+  child_pid = process_get_free_table_slot( );
   if( child_pid != -1 ){
     /* create a new thread and run it if process creation was succesfull */
+    process = &process_table[child_pid];
     child_tid = thread_create((void (*)(uint32_t))&process_wrapper, (uint32_t)child_pid);
-    process_table[child_pid].tid = child_tid;
-    process_table[child_pid].state = PROCESS_RUNNING;
-    process_table[child_pid].parent = &process_table[process_get_current_process()];
+
+    _interrupt_disable( );
+    spinlock_acquire( &pt_slock );  
+    /*==========LOCKED==========*/
+    process->tid = child_tid;
+    process->name = executable;
+    process->state = PROCESS_READY;
+    process->parent = &process_table[process_get_current_process()];
+    /*==========LOCKED==========*/
+    spinlock_release( &pt_slock );  
+    _interrupt_enable( );
+
     thread_run( child_tid );
+  } else {
+    /* do stuff. no more processes alloud*/
   }
   return child_pid; 
 }
 
 /* Stop the process and the thread it runs in. Sets the return value as well */
-void process_finish( int retval ) {
+void process_finish( int retval ) 
+{
   /* ====== DEBUG START ====== */
   /* DEBUG( "debug_processes", "process_finish() says ~ current_process: %s\n", process_table[process_get_current_process( )].name ); */
   /* ====== DEBUG END ====== */
   
   thread_table_t* current_thread_entry;
-  process_id_t current_pid;
-
+  process_control_block_t* current_process;
+  
   current_thread_entry = thread_get_current_thread_entry( );
-  current_pid = process_get_current_process( );
+  current_process = &process_table[process_get_current_process( )];
 
   _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
-  process_table[current_pid].state = PROCESS_DYING;
-  process_table[current_pid].return_code = retval;
-  sleepq_wake( &process_table[current_pid] );
+  current_process->state = PROCESS_DYING;
+  current_process->return_code = retval;
+  sleepq_wake( current_process );
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
   _interrupt_enable( );
 
+  /* kill thread */
   vm_destroy_pagetable( current_thread_entry->pagetable );
   current_thread_entry->pagetable = NULL;
   thread_finish( );
 }
 
-int process_join( process_id_t pid ) {
-
+int process_join( process_id_t pid ) 
+{
   int retval;
+  process_control_block_t* process;
+  process = &process_table[pid];
   
   _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
-  while( process_table[pid].state != PROCESS_DYING ){
-    sleepq_add( &process_table[pid] );
+  while( process->state != PROCESS_DYING ){
+    sleepq_add( process );
     spinlock_release( &pt_slock );
     thread_switch( );
     spinlock_acquire( &pt_slock );  
   } 
-  retval = process_table[pid].return_code;
+  retval = process->return_code;
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
   _interrupt_enable( );
@@ -306,45 +353,38 @@ process_control_block_t* process_get_process_entry( process_id_t pid ) {
 }
 
 /* AUX */
-process_id_t process_create( const char* executable ) 
+process_id_t process_get_free_table_slot( void ) 
 {
   process_id_t pid;
-  pid = 0;
-  
-  /* get and set id of process. could be cleaner
-   * the process id is always just the index into process table
-   * this works kind of weel and is OK efficient
-   */
+  process_id_t dying_pid;
+  pid = 1;
+  dying_pid = -1;
+ 
   _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
-  while( process_table[pid].state != PROCESS_FREE && pid < PROCESS_MAX_PROCESSES ) { pid++; }  
-  if( process_table[pid].state == PROCESS_FREE ) { 
-    /* set entries in PCB. 
-     * Don't know if this should be here yet...guess it's cool.
-     */
-    process_table[pid].pid = pid;
-    process_table[pid].state = PROCESS_READY;
-    process_table[pid].name = executable;
-    
-  } else { 
-    /* do something */
-    pid = -1;
-  }
+  /* search table for a FREE slot. keep track of DYING slot.*/
+  while( process_table[pid].state != PROCESS_FREE && pid < PROCESS_MAX_PROCESSES ) { 
+    if( process_table[pid].state == PROCESS_DYING && dying_pid == -1 ) { 
+      dying_pid = pid;
+    }
+    pid++; 
+  } 
+  /* no free slot found. try dying */
+  if( process_table[pid].state != PROCESS_FREE ) { pid = dying_pid; } 
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
   _interrupt_enable( );
-  
+   
   return pid;
 }
 
-/* this function is used to */
+/* this function is used to wrap thread function call. 
+ * could be usefull... 
+ */
 void process_wrapper( process_id_t pid )
 {
   process_start( pid );
   DEBUG( "debug_processes", "process_wrapper process_start returned\n" );
 }
-
-
- 
 /** @} */
