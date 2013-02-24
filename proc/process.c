@@ -232,7 +232,7 @@ void process_init_process( const char* executable )
     init_process->name = executable;
     init_process->state = PROCESS_READY;
   } else { 
-    KERNEL_PANIC("Create initial process failed!");
+    KERNEL_PANIC( "Create initial process failed!" );
   }
   process_start( 0 );
 }
@@ -281,16 +281,16 @@ void process_finish( int retval )
   /*==========LOCKED==========*/
   /* set return value */
   current_process->return_code = retval;
+  /* here should be code to reparent all children to init process */
+  if( current_process->child != NULL ){ current_process->child->parent = &process_table[0]; }
   /* the process becomes a zombie process. 
      parent must call wait() or join() */
   current_process->state = PROCESS_ZOMBIE;
-  /* here should be code to reparent all children to init process */
-  if( current_process->child != NULL ){ current_process->child->parent = &process_table[0]; }
   /* wake sleeping resource */
   sleepq_wake( current_process );
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
-  _interrupt_set_state(intr_status);
+  _interrupt_set_state( intr_status );
 
   /* kill thread */
   vm_destroy_pagetable( current_thread_entry->pagetable );
@@ -328,7 +328,7 @@ int process_join( process_id_t pid )
   join_process->state = PROCESS_DEAD;
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
-  _interrupt_set_state(intr_status);
+  _interrupt_set_state( intr_status );
   
   return retval; /* return childs exit code*/
 }
@@ -372,7 +372,7 @@ process_id_t process_get_free_table_slot( void )
   if( pid != -1 ) { process_table[pid].state = PROCESS_NONREADY; }
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
-  _interrupt_set_state(intr_status);
+  _interrupt_set_state( intr_status );
 
   return pid;
 }
