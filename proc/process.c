@@ -216,6 +216,7 @@ void process_init( void )
     process_table[pid].pid = pid;
     process_table[pid].state = PROCESS_FREE;
     process_table[pid].parent = NULL;
+    process_table[pid].child = NULL;
   }
 }
 
@@ -278,8 +279,14 @@ void process_finish( int retval )
   intr_status = _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
+  /* set return value */
   current_process->return_code = retval;
+  /* the process becomes a zombie process. 
+     parent must call wait() or join() */
   current_process->state = PROCESS_ZOMBIE;
+  /* here should be code to reparent all children to init process */
+  if( current_process->child != NULL ){ current_process->child->parent = &process_table[0]; }
+  /* wake sleeping resource */
   sleepq_wake( current_process );
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
