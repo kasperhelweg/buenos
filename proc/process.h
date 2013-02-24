@@ -62,7 +62,7 @@ typedef enum {
     PROCESS_NONREADY,
     PROCESS_DEAD,
     PROCESS_ZOMBIE
-} process_state_t;;
+} process_state_t;
 
 /* PCB */
 typedef struct process_control_block_t {

@@ -95,12 +95,6 @@ void process_start( process_id_t pid )
 
   /* set executable name */
   executable = process_table[pid].name;
-  
-  /* ====== DEBUG START ====== */
-  DEBUG( "debug_processes", "process_start() says ~ executable name: %s\n", executable );
-  DEBUG( "debug_processes", "process_start() says ~ tid: %d\n", thread_get_current_thread( ) );
-  DEBUG( "debug_processes", "process_start() says ~ pid: %d\n", pid );
-  /* ====== DEBUG END ====== */
 
   /* If the pagetable of this thread is not NULL, we are trying to
      run a userland process for a second time in the same thread.
@@ -205,14 +199,7 @@ void process_start( process_id_t pid )
   user_context.cpu_regs[MIPS_REGISTER_SP] = USERLAND_STACK_TOP;
   user_context.pc = elf.entry_point;
 
-  _interrupt_disable( );
-  spinlock_acquire( &pt_slock );  
-  /*==========LOCKED==========*/
   process_table[pid].state = PROCESS_RUNNING;
-  /*==========LOCKED==========*/
-  spinlock_release( &pt_slock );  
-  _interrupt_enable( );
-
   thread_goto_userland(&user_context);
 
   KERNEL_PANIC("thread_goto_userland failed.");
@@ -280,18 +267,15 @@ process_id_t process_spawn( const char* executable )
 
 /* Stop the process and the thread it runs in. Sets the return value as well */
 void process_finish( int retval ) 
-{
-  /* ====== DEBUG START ====== */
-  /* DEBUG( "debug_processes", "process_finish() says ~ current_process: %s\n", process_table[process_get_current_process( )].name ); */
-  /* ====== DEBUG END ====== */
-  
+{ 
+  interrupt_status_t intr_status;
   thread_table_t* current_thread_entry;
   process_control_block_t* current_process;
-  
+
   current_thread_entry = thread_get_current_thread_entry( );
   current_process = &process_table[process_get_current_process( )];
 
-  _interrupt_disable( );
+  intr_status = _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
   current_process->return_code = retval;
@@ -299,7 +283,7 @@ void process_finish( int retval )
   sleepq_wake( current_process );
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
-  _interrupt_enable( );
+  _interrupt_set_state(intr_status);
 
   /* kill thread */
   vm_destroy_pagetable( current_thread_entry->pagetable );
@@ -310,14 +294,17 @@ void process_finish( int retval )
 int process_join( process_id_t pid ) 
 {
   int retval;
+  interrupt_status_t intr_status;
   process_control_block_t* current_process;
   process_control_block_t* join_process;
-
+  process_state_t state_before_sleep;
+  
   /* get current and join processes */
   current_process = &process_table[process_get_current_process( )];
+  state_before_sleep = current_process->state;
   join_process = &process_table[pid];
 
-  _interrupt_disable( );
+  intr_status = _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
   while( join_process->state != PROCESS_ZOMBIE ){
@@ -330,11 +317,11 @@ int process_join( process_id_t pid )
   /* get return value */
   retval = join_process->return_code;
   /* mark current process as RUNNING and */
-  current_process->state = PROCESS_RUNNING;
+  current_process->state = state_before_sleep;
   join_process->state = PROCESS_DEAD;
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
-  _interrupt_enable( );
+  _interrupt_set_state(intr_status);
   
   return retval; /* return childs exit code*/
 }
@@ -358,10 +345,12 @@ process_id_t process_get_free_table_slot( void )
 {
   process_id_t pid;
   process_id_t first_dead_pid;
+  interrupt_status_t intr_status;
+
   pid = 1;
   first_dead_pid = -1;
  
-  _interrupt_disable( );
+  intr_status = _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
   /* search table for a FREE slot. keep track of DYING slot.*/
@@ -376,8 +365,8 @@ process_id_t process_get_free_table_slot( void )
   if( pid != -1 ) { process_table[pid].state = PROCESS_NONREADY; }
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
-  _interrupt_enable( );
-   
+  _interrupt_set_state(intr_status);
+
   return pid;
 }
 
