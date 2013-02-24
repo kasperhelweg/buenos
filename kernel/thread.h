@@ -81,6 +81,7 @@ typedef struct {
 } thread_table_t;
 
 /* function prototypes */
+thread_table_t *thread_get_thread_entry(TID_t);
 void thread_table_init(void);
 TID_t thread_create(void (*func)(uint32_t), uint32_t arg);
 void thread_run(TID_t t);

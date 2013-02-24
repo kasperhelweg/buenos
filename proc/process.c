@@ -34,7 +34,7 @@
  *
  */
 #include "lib/debug.h"
-
+#include "lib/libc.h"
 #include "proc/process.h"
 #include "proc/elf.h"
 #include "kernel/thread.h"
@@ -91,11 +91,11 @@ void process_start( process_id_t pid )
 
   /* initial thread_entry setup */
   my_entry = thread_get_current_thread_entry( );
-  my_entry->process_id = pid; 
-
-  /* set executable name */
+ 
+  /* set pid and executable name */
+  my_entry->process_id = pid;
   executable = process_table[pid].name;
-
+  
   /* If the pagetable of this thread is not NULL, we are trying to
      run a userland process for a second time in the same thread.
      This is not possible. */
@@ -103,7 +103,7 @@ void process_start( process_id_t pid )
 
   pagetable = vm_create_pagetable(thread_get_current_thread());
   KERNEL_ASSERT(pagetable != NULL);
-
+  
   intr_status = _interrupt_disable();
   my_entry->pagetable = pagetable;
   _interrupt_set_state(intr_status);
@@ -230,10 +230,10 @@ void process_init_process( const char* executable )
   
   init_process = &process_table[0];
   /* this can only be called from startup_thread */
-  if( init_process->state == PROCESS_FREE && thread_get_current_thread( ) == 1 ) { 
-    /* set entries in PCB. no need to lock the table. */
+  if( init_process->state == PROCESS_FREE && thread_get_current_thread( ) == 1 ) {      
+     /* set entries in PCB. no need to lock the table. */
     init_process->tid = 1;     
-    init_process->name = executable;
+    stringcopy(init_process->name, executable, 20);
     init_process->state = PROCESS_READY;
   } else { 
     KERNEL_PANIC( "Create initial process failed!" );
@@ -242,27 +242,26 @@ void process_init_process( const char* executable )
 }
 
 process_id_t process_spawn( const char* executable ) 
-{  
+{ 
+
   process_control_block_t* current_process;
   process_control_block_t* child_process;
   process_id_t child_pid;
   TID_t child_tid;
-
-  
+ 
   /* get the current process */
   current_process = &process_table[process_get_current_process( )];
   /* get free slot in process_table */
   child_pid = process_get_free_table_slot( );
   
   if( child_pid != -1 ){
-    
     /* create a new thread and run it if process creation was succesfull */
     child_process = &process_table[child_pid];
     child_tid = thread_create((void (*)(uint32_t))&process_wrapper, (uint32_t)child_pid);
-    
+  
     /* no need to lock the table */
     child_process->tid = child_tid;
-    child_process->name = executable;
+    stringcopy(child_process->name, executable, 20);
     child_process->parent = current_process;
     child_process->state = PROCESS_READY;
 
@@ -270,10 +269,9 @@ process_id_t process_spawn( const char* executable )
     child_process->left_child = current_process->right_child;
     current_process->right_child = child_process;
     
-    thread_run( child_tid );
+    thread_run( child_tid );   
   } else {
     /* do stuff. no more processes alloud*/
-    
   }
   return child_pid; 
 }
@@ -286,20 +284,21 @@ void process_finish( int retval )
   process_control_block_t* current_process;
   process_control_block_t* walker;
   process_control_block_t* lastnode;
-
   
-  current_thread_entry = thread_get_current_thread_entry( );
   current_process = &process_table[process_get_current_process( )];
+  current_thread_entry = thread_get_current_thread_entry( );
   
   intr_status = _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
   /* set return value */
   current_process->return_code = retval;
-  
+
+  /*
+   * reorganize children
+   */
   /* remove link from parent to this. parent points to next immediate child */
   (*(current_process->parent)).right_child = current_process->left_child;
-  
   /* any children? */
   if( current_process->right_child != NULL ){ 
     walker = current_process->right_child;
@@ -316,18 +315,16 @@ void process_finish( int retval )
   /* the process becomes a zombie process. 
      parent must call wait() or join() */
   current_process->state = PROCESS_ZOMBIE;
-  /* wake sleeping resource */
-  sleepq_wake( current_process );
+  /* wake sleeping resource(s) */
+  sleepq_wake_all( current_process );
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
   _interrupt_set_state( intr_status );
 
-  /* kill thread */
-  
+  /* kill thread */ 
   vm_destroy_pagetable( current_thread_entry->pagetable );
   current_thread_entry->pagetable = NULL;
-  thread_finish( );
-  
+  thread_finish( );  
 }
 
 int process_join( process_id_t pid ) 
@@ -342,7 +339,7 @@ int process_join( process_id_t pid )
   current_process = &process_table[process_get_current_process( )];
   state_before_sleep = current_process->state;
   join_process = &process_table[pid];
-
+ 
   intr_status = _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/

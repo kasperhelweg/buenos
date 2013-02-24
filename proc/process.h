@@ -65,7 +65,7 @@ typedef enum {
 /* PCB */
 typedef struct process_control_block_t {
   thread_id_t tid;
-  process_name_t name;
+  char name[20];
   process_state_t state;
   int return_code;
   
