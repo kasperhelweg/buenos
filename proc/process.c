@@ -199,8 +199,10 @@ void process_start( process_id_t pid )
   user_context.cpu_regs[MIPS_REGISTER_SP] = USERLAND_STACK_TOP;
   user_context.pc = elf.entry_point;
 
-  process_table[pid].state = PROCESS_RUNNING;
-  thread_goto_userland(&user_context);
+  if( process_table[pid].state == PROCESS_READY ){
+    process_table[pid].state = PROCESS_RUNNING;
+    thread_goto_userland(&user_context);
+  } 
 
   KERNEL_PANIC("thread_goto_userland failed.");
 }
@@ -245,7 +247,7 @@ process_id_t process_spawn( const char* executable )
   TID_t child_tid;
     
   /* get the current process */
-  current_process = &process_table[process_get_current_process()];
+  current_process = &process_table[process_get_current_process( )];
   /* get free slot in process_table */
   child_pid = process_get_free_table_slot( );
   if( child_pid != -1 ){
@@ -282,7 +284,7 @@ void process_finish( int retval )
   /* set return value */
   current_process->return_code = retval;
   /* here should be code to reparent all children to init process */
-  if( current_process->child != NULL ){ current_process->child->parent = &process_table[0]; }
+  if( current_process->child != NULL ){ (*(current_process->child)).parent = &process_table[0]; }
   /* the process becomes a zombie process. 
      parent must call wait() or join() */
   current_process->state = PROCESS_ZOMBIE;
@@ -362,7 +364,7 @@ process_id_t process_get_free_table_slot( void )
   /*==========LOCKED==========*/
   /* search table for a FREE slot. keep track of DYING slot.*/
   while( process_table[pid].state != PROCESS_FREE && pid < PROCESS_MAX_PROCESSES ) { 
-    if( process_table[pid].state == PROCESS_DEAD && first_dead_pid == -1 ) { 
+    if( first_dead_pid == -1 && process_table[pid].state == PROCESS_DEAD ) { 
       first_dead_pid = pid;
     }
     pid++; 
