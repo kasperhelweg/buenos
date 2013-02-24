@@ -215,10 +215,12 @@ void process_init( void )
   /* mark each process as free. 
    * no need to lock the table, since no threads are running */
   for( pid = 0; pid < PROCESS_MAX_PROCESSES; pid++ ){
-    process_table[pid].pid = pid;
     process_table[pid].state = PROCESS_FREE;
     process_table[pid].parent = NULL;
-    process_table[pid].child = NULL;
+      
+    /* init children datastructure */
+    process_table[pid].left_child = NULL;
+    process_table[pid].right_child = NULL;
   }
 }
 
@@ -245,25 +247,33 @@ process_id_t process_spawn( const char* executable )
   process_control_block_t* child_process;
   process_id_t child_pid;
   TID_t child_tid;
-    
+
+  
   /* get the current process */
   current_process = &process_table[process_get_current_process( )];
   /* get free slot in process_table */
   child_pid = process_get_free_table_slot( );
+  
   if( child_pid != -1 ){
+    
     /* create a new thread and run it if process creation was succesfull */
     child_process = &process_table[child_pid];
     child_tid = thread_create((void (*)(uint32_t))&process_wrapper, (uint32_t)child_pid);
+    
     /* no need to lock the table */
     child_process->tid = child_tid;
     child_process->name = executable;
     child_process->parent = current_process;
     child_process->state = PROCESS_READY;
 
-    current_process->child = child_process;
+    /* add child */
+    child_process->left_child = current_process->right_child;
+    current_process->right_child = child_process;
+    
     thread_run( child_tid );
   } else {
     /* do stuff. no more processes alloud*/
+    
   }
   return child_pid; 
 }
@@ -274,17 +284,35 @@ void process_finish( int retval )
   interrupt_status_t intr_status;
   thread_table_t* current_thread_entry;
   process_control_block_t* current_process;
+  process_control_block_t* walker;
+  process_control_block_t* lastnode;
 
+  
   current_thread_entry = thread_get_current_thread_entry( );
   current_process = &process_table[process_get_current_process( )];
-
+  
   intr_status = _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
   /* set return value */
   current_process->return_code = retval;
-  /* here should be code to reparent all children to init process */
-  if( current_process->child != NULL ){ (*(current_process->child)).parent = &process_table[0]; }
+  
+  /* remove link from parent to this. parent points to next immediate child */
+  (*(current_process->parent)).right_child = current_process->left_child;
+  
+  /* any children? */
+  if( current_process->right_child != NULL ){ 
+    walker = current_process->right_child;
+    /* reparent all children to the init procees */
+    while( walker != NULL ){
+      (*(walker)).parent = &process_table[0];
+      lastnode = walker; walker = walker->left_child;
+    }
+    /* splice trees together */
+    lastnode->left_child = process_table[0].right_child;
+    process_table[0].right_child = current_process->right_child; 
+  }
+  
   /* the process becomes a zombie process. 
      parent must call wait() or join() */
   current_process->state = PROCESS_ZOMBIE;
@@ -295,9 +323,11 @@ void process_finish( int retval )
   _interrupt_set_state( intr_status );
 
   /* kill thread */
+  
   vm_destroy_pagetable( current_thread_entry->pagetable );
   current_thread_entry->pagetable = NULL;
   thread_finish( );
+  
 }
 
 int process_join( process_id_t pid ) 
@@ -327,6 +357,9 @@ int process_join( process_id_t pid )
   retval = join_process->return_code;
   /* mark current process as RUNNING and */
   current_process->state = state_before_sleep;
+  /* clean up join process */
+  join_process->left_child = NULL;
+  join_process->right_child = NULL;
   join_process->state = PROCESS_DEAD;
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
@@ -358,7 +391,7 @@ process_id_t process_get_free_table_slot( void )
 
   pid = 1;
   first_dead_pid = -1;
- 
+
   intr_status = _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/

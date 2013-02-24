@@ -49,7 +49,6 @@
 #define PROVIDE_HEAP_ALLOCATOR 
 #define PROVIDE_MISC
 
-
 #include <stdarg.h>
 #include <stddef.h>
 #include "lib/types.h"

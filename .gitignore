@@ -35,7 +35,10 @@ doc/
 halt
 readwrite
 calc
+exit
 exec
+exec_exit
+exec_calc
 hw
 
 

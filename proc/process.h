@@ -40,11 +40,9 @@
 /* typedefs for process */
 typedef int process_id_t;
 typedef int thread_id_t;
-/* process name, currently restricted to 20 chars + escape */
-typedef const char* process_name_t;
 
-/* filedescriptor id type */
-typedef int filedescriptor_id_t;
+/* process name, currently restricted */
+typedef const char* process_name_t;
 
 #define USERLAND_STACK_TOP 0x7fffeffc
 
@@ -66,7 +64,6 @@ typedef enum {
 
 /* PCB */
 typedef struct process_control_block_t {
-  process_id_t pid;
   thread_id_t tid;
   process_name_t name;
   process_state_t state;
@@ -79,17 +76,10 @@ typedef struct process_control_block_t {
   /* children( choose a datasctructure for these ) */
   /* for now a single child is allowed */
   /* *************** */
-  struct process_control_block_t* child;
-  
+  struct process_control_block_t* left_child;
+  struct process_control_block_t* right_child;
+    
 } process_control_block_t;
-
-/* choose a datastrucure to hold files */ 
-/* FD block */
-typedef struct process_file_descriptor_t {
-  /* the filedescriptor id*/
-  filedescriptor_id_t fid;
-
-} process_file_descriptor_t;
 
 
 /* Initialize the process table.  This must be called during kernel
