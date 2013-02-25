@@ -256,19 +256,20 @@ process_id_t process_spawn( const char* executable )
   
   /* create a new thread and run it if process creation was succesfull */
   if( child_pid > 0 ){
+ 
     child_process = &process_table[child_pid];
     child_tid = thread_create((void (*)(uint32_t))&process_wrapper, (uint32_t)child_pid);
   
     /* no need to lock the table */
     child_process->tid = child_tid;
     stringcopy(child_process->name, executable, PROCESS_MAX_EXEC_CHARS);
-    child_process->parent = current_process;
     child_process->state = PROCESS_READY;
 
     /* add child */
+    child_process->parent = current_process;
     child_process->left_child = current_process->right_child;
     current_process->right_child = child_process;
-    
+
     /* run thread */
     thread_run( child_tid );   
   } else {
@@ -286,6 +287,7 @@ void process_finish( int retval )
   thread_table_t* current_thread_entry;
   process_control_block_t* current_process;
   process_id_t pid;
+
   /* pointers to manipulate child/parent structure */
   process_control_block_t* walker;
   process_control_block_t* lastnode;
@@ -295,9 +297,6 @@ void process_finish( int retval )
     /* get current process and thread */
     current_process = &process_table[pid];
     current_thread_entry = thread_get_current_thread_entry( );
-    
-    /* set return value */
-    current_process->return_code = retval;
     
     /* reorganize children. 
      * might need to be locked...not sure. */
@@ -316,10 +315,12 @@ void process_finish( int retval )
       lastnode->left_child = process_table[0].right_child;
       process_table[0].right_child = current_process->right_child; 
     }
-  
+    
     intr_status = _interrupt_disable( );
     spinlock_acquire( &pt_slock );  
     /*==========LOCKED==========*/
+    /* set return value */
+    current_process->return_code = retval;
     /* the process becomes a zombie process. 
        parent must call wait() or join() */
     current_process->state = PROCESS_ZOMBIE;  
@@ -329,6 +330,7 @@ void process_finish( int retval )
     spinlock_release( &pt_slock );  
     _interrupt_set_state( intr_status );
     
+    /* do magic cleanup code and finish thread */
     vm_destroy_pagetable( current_thread_entry->pagetable );
     current_thread_entry->pagetable = NULL;
     
@@ -364,6 +366,7 @@ int process_join( process_id_t pid )
   /* get return value */
   retval = join_process->return_code;
   /* clean up join process */
+  join_process->parent = NULL;
   join_process->left_child = NULL;
   join_process->right_child = NULL;
   join_process->state = PROCESS_DEAD;
