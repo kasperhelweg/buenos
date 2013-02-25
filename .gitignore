@@ -39,6 +39,7 @@ exit
 exec
 exec_exit
 exec_calc
+exec_fail
 hw
 
 

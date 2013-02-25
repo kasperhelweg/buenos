@@ -46,7 +46,7 @@ typedef int thread_id_t;
 #define PROCESS_PTABLE_FULL  -1
 #define PROCESS_ILLEGAL_JOIN -2
 
-#define PROCESS_MAX_PROCESSES 10
+#define PROCESS_MAX_PROCESSES 32
 #define PROCESS_MAX_EXEC_CHARS 20
 
 /* state enum */
