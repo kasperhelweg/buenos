@@ -41,15 +41,13 @@
 typedef int process_id_t;
 typedef int thread_id_t;
 
-/* process name, currently restricted */
-typedef const char* process_name_t;
-
 #define USERLAND_STACK_TOP 0x7fffeffc
 
 #define PROCESS_PTABLE_FULL  -1
 #define PROCESS_ILLEGAL_JOIN -2
 
 #define PROCESS_MAX_PROCESSES 32
+#define PROCESS_MAX_EXEC_CHARS 20
 
 /* state enum */
 typedef enum {
@@ -65,20 +63,19 @@ typedef enum {
 /* PCB */
 typedef struct process_control_block_t {
   thread_id_t tid;
-  char name[20];
-  process_state_t state;
   int return_code;
-  
-  /* parent process stuff */
+  process_state_t state;
+  /* name of executable */
+  char name[PROCESS_MAX_EXEC_CHARS];
+
+  /* parent child structure
+   * not tested very well, at all... */
+  /* *************** */
+  /* parents */
   struct process_control_block_t* parent;
-  
-  /* *************** */
-  /* children( choose a datasctructure for these ) */
-  /* for now a single child is allowed */
-  /* *************** */
+  /* children */
   struct process_control_block_t* left_child;
   struct process_control_block_t* right_child;
-    
 } process_control_block_t;
 
 

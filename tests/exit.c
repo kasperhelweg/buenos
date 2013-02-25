@@ -40,7 +40,7 @@
 int main(void)
 {
 
-  syscall_exit( 100 );
+  syscall_exit( 2 );
 
   return 0;
 }

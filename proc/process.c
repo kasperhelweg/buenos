@@ -88,7 +88,7 @@ void process_start( process_id_t pid )
   int i;
 
   interrupt_status_t intr_status;
-
+  
   /* initial thread_entry setup */
   my_entry = thread_get_current_thread_entry( );
  
@@ -203,7 +203,6 @@ void process_start( process_id_t pid )
     process_table[pid].state = PROCESS_RUNNING;
     thread_goto_userland(&user_context);
   } 
-
   KERNEL_PANIC("thread_goto_userland failed.");
 }
 
@@ -216,8 +215,7 @@ void process_init( void )
    * no need to lock the table, since no threads are running */
   for( pid = 0; pid < PROCESS_MAX_PROCESSES; pid++ ){
     process_table[pid].state = PROCESS_FREE;
-    process_table[pid].parent = NULL;
-      
+    process_table[pid].parent = NULL;      
     /* init children datastructure */
     process_table[pid].left_child = NULL;
     process_table[pid].right_child = NULL;
@@ -233,7 +231,9 @@ void process_init_process( const char* executable )
   if( init_process->state == PROCESS_FREE && thread_get_current_thread( ) == 1 ) {      
      /* set entries in PCB. no need to lock the table. */
     init_process->tid = 1;     
-    stringcopy(init_process->name, executable, 20);
+    /* set name */
+    stringcopy(init_process->name, executable, PROCESS_MAX_EXEC_CHARS);
+    /* set state */
     init_process->state = PROCESS_READY;
   } else { 
     KERNEL_PANIC( "Create initial process failed!" );
@@ -243,9 +243,9 @@ void process_init_process( const char* executable )
 
 process_id_t process_spawn( const char* executable ) 
 { 
-
   process_control_block_t* current_process;
   process_control_block_t* child_process;
+  
   process_id_t child_pid;
   TID_t child_tid;
  
@@ -254,14 +254,14 @@ process_id_t process_spawn( const char* executable )
   /* get free slot in process_table */
   child_pid = process_get_free_table_slot( );
   
-  if( child_pid != -1 ){
-    /* create a new thread and run it if process creation was succesfull */
+  /* create a new thread and run it if process creation was succesfull */
+  if( child_pid > 0 ){
     child_process = &process_table[child_pid];
     child_tid = thread_create((void (*)(uint32_t))&process_wrapper, (uint32_t)child_pid);
   
     /* no need to lock the table */
     child_process->tid = child_tid;
-    stringcopy(child_process->name, executable, 20);
+    stringcopy(child_process->name, executable, PROCESS_MAX_EXEC_CHARS);
     child_process->parent = current_process;
     child_process->state = PROCESS_READY;
 
@@ -269,9 +269,11 @@ process_id_t process_spawn( const char* executable )
     child_process->left_child = current_process->right_child;
     current_process->right_child = child_process;
     
+    /* run thread */
     thread_run( child_tid );   
   } else {
     /* do stuff. no more processes alloud*/
+    KERNEL_PANIC( "Process allocation failed!" );
   }
   return child_pid; 
 }
@@ -280,80 +282,87 @@ process_id_t process_spawn( const char* executable )
 void process_finish( int retval ) 
 { 
   interrupt_status_t intr_status;
+  
   thread_table_t* current_thread_entry;
   process_control_block_t* current_process;
+  process_id_t pid;
+  /* pointers to manipulate child/parent structure */
   process_control_block_t* walker;
   process_control_block_t* lastnode;
-  
-  current_process = &process_table[process_get_current_process( )];
-  current_thread_entry = thread_get_current_thread_entry( );
-  
-  intr_status = _interrupt_disable( );
-  spinlock_acquire( &pt_slock );  
-  /*==========LOCKED==========*/
-  /* set return value */
-  current_process->return_code = retval;
 
-  /*
-   * reorganize children
-   */
-  /* remove link from parent to this. parent points to next immediate child */
-  (*(current_process->parent)).right_child = current_process->left_child;
-  /* any children? */
-  if( current_process->right_child != NULL ){ 
-    walker = current_process->right_child;
-    /* reparent all children to the init procees */
-    while( walker != NULL ){
-      (*(walker)).parent = &process_table[0];
-      lastnode = walker; walker = walker->left_child;
+  pid = process_get_current_process( );
+  if( pid != 0 ) {
+    /* get current process and thread */
+    current_process = &process_table[pid];
+    current_thread_entry = thread_get_current_thread_entry( );
+    
+    /* set return value */
+    current_process->return_code = retval;
+    
+    /* reorganize children. 
+     * might need to be locked...not sure. */
+    /* remove link from parent to this. parent points to next immediate child */
+    
+    (*(current_process->parent)).right_child = current_process->left_child;
+    /* any children? */
+    if( current_process->right_child != NULL ){ 
+      walker = current_process->right_child;
+      /* reparent all children to the init procees */
+      while( walker != NULL ){
+        (*(walker)).parent = &process_table[0];
+        lastnode = walker; walker = walker->left_child;
+      }
+      /* splice trees together */
+      lastnode->left_child = process_table[0].right_child;
+      process_table[0].right_child = current_process->right_child; 
     }
-    /* splice trees together */
-    lastnode->left_child = process_table[0].right_child;
-    process_table[0].right_child = current_process->right_child; 
-  }
   
-  /* the process becomes a zombie process. 
-     parent must call wait() or join() */
-  current_process->state = PROCESS_ZOMBIE;
-  /* wake sleeping resource(s) */
-  sleepq_wake_all( current_process );
-  /*==========LOCKED==========*/
-  spinlock_release( &pt_slock );  
-  _interrupt_set_state( intr_status );
-
-  /* kill thread */ 
-  vm_destroy_pagetable( current_thread_entry->pagetable );
-  current_thread_entry->pagetable = NULL;
-  thread_finish( );  
+    intr_status = _interrupt_disable( );
+    spinlock_acquire( &pt_slock );  
+    /*==========LOCKED==========*/
+    /* the process becomes a zombie process. 
+       parent must call wait() or join() */
+    current_process->state = PROCESS_ZOMBIE;  
+    /* wake sleeping resource(s) */
+    sleepq_wake_all( current_process );
+    /*==========LOCKED==========*/
+    spinlock_release( &pt_slock );  
+    _interrupt_set_state( intr_status );
+    
+    vm_destroy_pagetable( current_thread_entry->pagetable );
+    current_thread_entry->pagetable = NULL;
+    
+    thread_finish( );  
+  } else {
+    /* initial process exited...do stuff*/
+    KERNEL_PANIC( "Initial process exited. Not sure what to do...so panic!" );
+  }   
 }
 
 int process_join( process_id_t pid ) 
 {
-  int retval;
   interrupt_status_t intr_status;
+
+  int retval;  
   process_control_block_t* current_process;
   process_control_block_t* join_process;
-  process_state_t state_before_sleep;
-  
+    
   /* get current and join processes */
   current_process = &process_table[process_get_current_process( )];
-  state_before_sleep = current_process->state;
   join_process = &process_table[pid];
- 
+   
   intr_status = _interrupt_disable( );
   spinlock_acquire( &pt_slock );  
   /*==========LOCKED==========*/
   while( join_process->state != PROCESS_ZOMBIE ){
-    sleepq_add( join_process );
     current_process->state = PROCESS_SLEEPING;
+    sleepq_add( join_process );
     spinlock_release( &pt_slock );
     thread_switch( );
     spinlock_acquire( &pt_slock );  
   } 
   /* get return value */
   retval = join_process->return_code;
-  /* mark current process as RUNNING and */
-  current_process->state = state_before_sleep;
   /* clean up join process */
   join_process->left_child = NULL;
   join_process->right_child = NULL;
@@ -361,7 +370,7 @@ int process_join( process_id_t pid )
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
   _interrupt_set_state( intr_status );
-  
+ 
   return retval; /* return childs exit code*/
 }
 
@@ -390,7 +399,7 @@ process_id_t process_get_free_table_slot( void )
   first_dead_pid = -1;
 
   intr_status = _interrupt_disable( );
-  spinlock_acquire( &pt_slock );  
+  spinlock_acquire( &pt_slock );   
   /*==========LOCKED==========*/
   /* search table for a FREE slot. keep track of DYING slot.*/
   while( process_table[pid].state != PROCESS_FREE && pid < PROCESS_MAX_PROCESSES ) { 
@@ -405,7 +414,7 @@ process_id_t process_get_free_table_slot( void )
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
   _interrupt_set_state( intr_status );
-
+  
   return pid;
 }
 
