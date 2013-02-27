@@ -15,19 +15,38 @@
  * @{
  */
 
-typedef struct lock_t {
-
-} lock_t;
-
-typedef int cond_t;
-
-int lock_reset( lock_t* lock );
-void lock_acquire( lock_t* lock );
-void lock_release( lock_t* lock );
+int lock_reset( lock_t* lock )
+{
+  lock = lock;
+  return 0;
+}
+void lock_acquire( lock_t* lock )
+{
+  lock = lock;
+}
+void lock_release( lock_t* lock )
+{
+  lock = lock;
+}
 
 /* condition variable */
 
-void condition_init( cond_t* cond );
-void condition_wait( cond_t* cond, lock_t* lock );
-void condition_signal( cond_t* cond, lock_t* lock );
-void condition_broadcast( cond_t* cond, lock_t* lock );
+void condition_init( cond_t* cond )
+{
+  cond = cond;
+}
+void condition_wait( cond_t* cond, lock_t* lock )
+{
+  lock = lock;
+  cond = cond;
+}
+void condition_signal( cond_t* cond, lock_t* lock )
+{
+  lock = lock;
+  cond = cond;
+}
+void condition_broadcast( cond_t* cond, lock_t* lock )
+{
+  lock = lock;
+  cond = cond;
+}
