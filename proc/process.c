@@ -47,8 +47,18 @@
 #include "vm/vm.h"
 #include "vm/pagepool.h"
 
+#include "kernel/lock_cond.h"
+
+
+#define SLOCK 
+
+/*
+#define MLOCK 
+*/
+
 /* process_tabel spinlock */
 static spinlock_t pt_slock;
+static lock_t pt_lock;
 
 /* internal prototypes */
 process_id_t process_get_free_table_slot( void );
@@ -211,6 +221,7 @@ void process_init( void )
   int pid;
   /* set the spinclok to free*/
   spinlock_reset(&pt_slock);
+  lock_reset(&pt_lock);
   /* mark each process as free. 
    * no need to lock the table, since no threads are running */
   for( pid = 0; pid < PROCESS_MAX_PROCESSES; pid++ ){
@@ -220,6 +231,7 @@ void process_init( void )
     process_table[pid].left_child = NULL;
     process_table[pid].right_child = NULL;
   }
+  DEBUG( "debug_locks", "Lock says: : %d\n", pt_lock.count );
 }
 
 void process_init_process( const char* executable ) 
@@ -343,8 +355,6 @@ void process_finish( int retval )
 
 int process_join( process_id_t pid ) 
 {
-  interrupt_status_t intr_status;
-
   int retval;  
   process_control_block_t* current_process;
   process_control_block_t* join_process;
@@ -352,9 +362,17 @@ int process_join( process_id_t pid )
   /* get current and join processes */
   current_process = &process_table[process_get_current_process( )];
   join_process = &process_table[pid];
-   
+
+#ifdef SLOCK
+  interrupt_status_t intr_status;
   intr_status = _interrupt_disable( );
-  spinlock_acquire( &pt_slock );  
+  spinlock_acquire( &pt_slock );
+#endif  
+#ifdef MLOCK
+  interrupt_status_t intr_status;
+  intr_status = _interrupt_disable( );
+  lock_acquire( &lock );
+#endif  
   /*==========LOCKED==========*/
   while( join_process->state != PROCESS_ZOMBIE ){
     current_process->state = PROCESS_SLEEPING;
@@ -371,9 +389,15 @@ int process_join( process_id_t pid )
   join_process->right_child = NULL;
   join_process->state = PROCESS_DEAD;
   /*==========LOCKED==========*/
+#ifdef SLOCK
   spinlock_release( &pt_slock );  
   _interrupt_set_state( intr_status );
- 
+#endif
+#ifdef MLOCK
+  intr_status = _interrupt_disable( );
+  lock_release( &lock );
+#endif  
+  
   return retval; /* return childs exit code*/
 }
 
@@ -394,13 +418,10 @@ process_control_block_t* process_get_process_entry( process_id_t pid ) {
 /* AUX */
 process_id_t process_get_free_table_slot( void ) 
 {
-  process_id_t pid;
-  process_id_t first_dead_pid;
+  process_id_t pid = 1;
+  process_id_t first_dead_pid = -1;
+    
   interrupt_status_t intr_status;
-
-  pid = 1;
-  first_dead_pid = -1;
-
   intr_status = _interrupt_disable( );
   spinlock_acquire( &pt_slock );   
   /*==========LOCKED==========*/

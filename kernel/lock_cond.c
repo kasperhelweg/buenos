@@ -1,4 +1,11 @@
 #include "kernel/lock_cond.h"
+#include "lib/debug.h"
+#include "kernel/thread.h"
+#include "kernel/assert.h"
+#include "kernel/interrupt.h"
+#include "kernel/config.h"
+#include "kernel/sleepq.h"
+#include "drivers/metadev.h"
 
 /** @name Mutex locks
  *
@@ -14,37 +21,59 @@
  *
  * @{
  */
-
 int lock_reset( lock_t* lock )
 {
-  lock = lock;
-  return 0;
+  /* numcpus = cpustatus_count(); */
+  lock->state = LOCK_FREE;
+  lock->owner = 0;
+  lock->count = 0;
+  
+  return lock->state;
 }
+
 void lock_acquire( lock_t* lock )
 {
-  lock = lock;
+  switch( lock-> state ) {
+  case LOCK_FREE:
+    lock = lock;               
+    break;
+  case LOCK_LOCKED:
+    /* dummy */
+    lock = lock;
+    break;
+  default:
+    lock = lock;
+  }
 }
+
 void lock_release( lock_t* lock )
 {
   lock = lock;
 }
 
-/* condition variable */
+lock_state_t lock_try_lock( lock_t* lock )
+{
+  return lock->state;
+}
 
+/* condition variables */
 void condition_init( cond_t* cond )
 {
   cond = cond;
 }
+
 void condition_wait( cond_t* cond, lock_t* lock )
 {
   lock = lock;
   cond = cond;
 }
+
 void condition_signal( cond_t* cond, lock_t* lock )
 {
   lock = lock;
   cond = cond;
 }
+
 void condition_broadcast( cond_t* cond, lock_t* lock )
 {
   lock = lock;

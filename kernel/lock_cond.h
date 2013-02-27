@@ -13,18 +13,26 @@
  * @{
  */
 
-typedef struct lock_t {
+typedef enum {
+  LOCK_FREE,
+  LOCK_LOCKED
+} lock_state_t;
 
+typedef struct lock_t {
+  lock_state_t state;
+  int owner;
+  unsigned int count;
 } lock_t;
 
+/* dummy. remove */
 typedef int cond_t;
 
 int lock_reset( lock_t* lock );
 void lock_acquire( lock_t* lock );
 void lock_release( lock_t* lock );
+lock_state_t lock_try_lock( lock_t* lock );
 
-/* condition variable */
-
+/* condition variables */
 void condition_init( cond_t* cond );
 void condition_wait( cond_t* cond, lock_t* lock );
 void condition_signal( cond_t* cond, lock_t* lock );
