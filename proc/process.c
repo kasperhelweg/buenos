@@ -49,11 +49,8 @@
 
 #include "kernel/lock_cond.h"
 
-
-#define SLOCK 
-
-/*
-#define MLOCK 
+/* using spin locks? 
+ * #define SLOCK 
 */
 
 /* process_tabel spinlock */
@@ -220,6 +217,11 @@ void process_init( void )
 {
   int pid;
   /* set the spinclok to free*/
+#ifdef SLOCK
+  DEBUG( "debug_locks", "Using slokcs\n" );
+#else
+  DEBUG( "debug_locks", "Using mutex\n" );
+#endif
   spinlock_reset(&pt_slock);
   lock_reset(&pt_lock);
   /* mark each process as free. 
@@ -231,7 +233,6 @@ void process_init( void )
     process_table[pid].left_child = NULL;
     process_table[pid].right_child = NULL;
   }
-  DEBUG( "debug_locks", "Lock says: : %d\n", pt_lock.count );
 }
 
 void process_init_process( const char* executable ) 
@@ -293,9 +294,7 @@ process_id_t process_spawn( const char* executable )
 
 /* Stop the process and the thread it runs in. Sets the return value as well */
 void process_finish( int retval ) 
-{ 
-  interrupt_status_t intr_status;
-  
+{   
   thread_table_t* current_thread_entry;
   process_control_block_t* current_process;
   process_id_t pid;
@@ -310,10 +309,8 @@ void process_finish( int retval )
     current_process = &process_table[pid];
     current_thread_entry = thread_get_current_thread_entry( );
     
-    /* reorganize children. 
-     * might need to be locked...not sure. */
-    /* remove link from parent to this. parent points to next immediate child */
-    
+    /* reorganize children.  might need to be locked...not sure. */
+    /* remove link from parent to this. parent points to next immediate child */  
     (*(current_process->parent)).right_child = current_process->left_child;
     /* any children? */
     if( current_process->right_child != NULL ){ 
@@ -328,8 +325,9 @@ void process_finish( int retval )
       process_table[0].right_child = current_process->right_child; 
     }
     
+    interrupt_status_t intr_status;
     intr_status = _interrupt_disable( );
-    spinlock_acquire( &pt_slock );  
+    spinlock_acquire( &pt_slock );
     /*==========LOCKED==========*/
     /* set return value */
     current_process->return_code = retval;
@@ -337,12 +335,11 @@ void process_finish( int retval )
        parent must call wait() or join() */
     current_process->state = PROCESS_ZOMBIE;  
     /* wake sleeping resource(s) */
-    sleepq_wake_all( current_process );
+    sleepq_wake( current_process );
     /*==========LOCKED==========*/
     spinlock_release( &pt_slock );  
     _interrupt_set_state( intr_status );
-    
-    /* do magic cleanup code and finish thread */
+       /* do magic cleanup code and finish thread */
     vm_destroy_pagetable( current_thread_entry->pagetable );
     current_thread_entry->pagetable = NULL;
     
@@ -363,20 +360,14 @@ int process_join( process_id_t pid )
   current_process = &process_table[process_get_current_process( )];
   join_process = &process_table[pid];
 
-#ifdef SLOCK
   interrupt_status_t intr_status;
   intr_status = _interrupt_disable( );
   spinlock_acquire( &pt_slock );
-#endif  
-#ifdef MLOCK
-  interrupt_status_t intr_status;
-  intr_status = _interrupt_disable( );
-  lock_acquire( &lock );
-#endif  
   /*==========LOCKED==========*/
   while( join_process->state != PROCESS_ZOMBIE ){
-    current_process->state = PROCESS_SLEEPING;
     sleepq_add( join_process );
+    /* this is weid... threade is always running it appears */
+    current_process->state = thread_get_current_thread_entry( )->state;
     spinlock_release( &pt_slock );
     thread_switch( );
     spinlock_acquire( &pt_slock );  
@@ -389,14 +380,8 @@ int process_join( process_id_t pid )
   join_process->right_child = NULL;
   join_process->state = PROCESS_DEAD;
   /*==========LOCKED==========*/
-#ifdef SLOCK
   spinlock_release( &pt_slock );  
   _interrupt_set_state( intr_status );
-#endif
-#ifdef MLOCK
-  intr_status = _interrupt_disable( );
-  lock_release( &lock );
-#endif  
   
   return retval; /* return childs exit code*/
 }
@@ -421,9 +406,18 @@ process_id_t process_get_free_table_slot( void )
   process_id_t pid = 1;
   process_id_t first_dead_pid = -1;
     
+  /*
   interrupt_status_t intr_status;
   intr_status = _interrupt_disable( );
   spinlock_acquire( &pt_slock );   
+  */
+#ifdef SLOCK
+  interrupt_status_t intr_status;
+  intr_status = _interrupt_disable( );
+  spinlock_acquire( &pt_slock );   
+#else
+  lock_acquire( &pt_lock );
+#endif
   /*==========LOCKED==========*/
   /* search table for a FREE slot. keep track of DYING slot.*/
   while( process_table[pid].state != PROCESS_FREE && pid < PROCESS_MAX_PROCESSES ) { 
@@ -436,9 +430,12 @@ process_id_t process_get_free_table_slot( void )
   if( process_table[pid].state != PROCESS_FREE ) { pid = first_dead_pid; } 
   if( pid != -1 ) { process_table[pid].state = PROCESS_NONREADY; }
   /*==========LOCKED==========*/
+#ifdef SLOCK
   spinlock_release( &pt_slock );  
   _interrupt_set_state( intr_status );
-  
+#else
+  lock_release( &pt_lock );
+#endif
   return pid;
 }
 

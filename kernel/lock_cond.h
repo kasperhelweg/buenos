@@ -13,6 +13,9 @@
  * @{
  */
 
+#define LOCK_RESET_FAILED -1
+#define LOCK_NOT_OWNED -1
+
 typedef enum {
   LOCK_FREE,
   LOCK_LOCKED
