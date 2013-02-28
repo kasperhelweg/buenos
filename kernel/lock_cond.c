@@ -29,7 +29,7 @@ int lock_reset( lock_t* lock )
   /* if on mult.proc. machine, fallback to spinlock numcpus = cpustatus_count(); */
   if( lock != NULL && !(lock->state == LOCK_FREE || lock->state == LOCK_LOCKED) ) {
     lock->state = LOCK_FREE; lock->owner = LOCK_NOT_OWNED; lock->count = 0;
-    spinlock_reset(&lock_cond_slock);
+    spinlock_reset( &lock_cond_slock );
     return LOCK_FREE;
   } else {
     return LOCK_RESET_FAILED;
@@ -40,38 +40,38 @@ void lock_acquire( lock_t* lock )
 {
   interrupt_status_t intr_status;
 
-  intr_status = _interrupt_disable();
-  spinlock_acquire(&lock_cond_slock);
+  intr_status = _interrupt_disable( );
+  spinlock_acquire( &lock_cond_slock );
   /*==========LOCKED==========*/
   switch( lock->state ) {
   case LOCK_FREE:
     lock->state = LOCK_LOCKED; lock->owner = (int)thread_get_current_thread( ); lock->count++;
-    spinlock_release(&lock_cond_slock);
+    spinlock_release( &lock_cond_slock );
     break;
   case LOCK_LOCKED:
-    sleepq_add(lock);
-    spinlock_release(&lock_cond_slock);
+    sleepq_add( lock );
+    spinlock_release( &lock_cond_slock );
     thread_switch();
     break;
   default:
-    spinlock_release(&lock_cond_slock);
+    spinlock_release( &lock_cond_slock );
   }
   /*==========LOCKED==========*/
-  _interrupt_set_state(intr_status);
+  _interrupt_set_state( intr_status );
 }
 
 void lock_release( lock_t* lock )
 {
   interrupt_status_t intr_status;
 
-  intr_status = _interrupt_disable();
-  spinlock_acquire(&lock_cond_slock);
+  intr_status = _interrupt_disable( );
+  spinlock_acquire( &lock_cond_slock );
   /*==========LOCKED==========*/
   lock->state = LOCK_FREE; lock->owner = LOCK_NOT_OWNED; 
   sleepq_wake( lock );
   /*==========LOCKED==========*/
-  spinlock_release(&lock_cond_slock);
-  _interrupt_set_state(intr_status);
+  spinlock_release( &lock_cond_slock );
+  _interrupt_set_state( intr_status );
 }
 
 lock_state_t lock_try_lock( lock_t* lock )

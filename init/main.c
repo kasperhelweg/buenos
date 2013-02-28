@@ -41,6 +41,7 @@
 #include "drivers/polltty.h"
 #include "drivers/yams.h"
 #include "fs/vfs.h"
+#include "kernel/lock_cond.h"
 #include "kernel/assert.h"
 #include "kernel/config.h"
 #include "kernel/halt.h"
@@ -56,6 +57,80 @@
 #include "net/network.h"
 #include "proc/process.h"
 #include "vm/vm.h"
+
+
+#define DTHREADS 29
+#define VECLENGTH DTHREADS * 5
+typedef struct DOTDATA 
+ {
+   int      a[VECLENGTH];
+   int      b[VECLENGTH];
+   int     sum; 
+   int     veclen; 
+ } DOTDATA;
+
+static DOTDATA* dotdata;
+static int threadcount;
+
+static lock_t lock;
+
+static int* read;
+
+void thread_a( uint32_t arg)
+{
+  int a;
+
+  if( arg == 0 ){
+    lock_acquire( &lock );
+    a = *read;
+    thread_yield( );
+    lock_release( &lock );
+  } else {
+    a = *read;
+    thread_yield( );
+  }
+
+  if( a == *read){
+    kprintf("GREAT!\n");
+  } else {
+    kprintf("FAIL!\n");
+  }
+  thread_finish( );
+}
+
+void thread_b( uint32_t arg)
+{
+  if( arg == 0 ){
+    lock_acquire( &lock );
+    *read = 1;
+    lock_release( &lock );
+  } else {
+    *read = 1;
+  }
+  kprintf("READ: %d\n", *read);
+  thread_finish( );
+} 
+
+void dot_thread( uint32_t arg)
+{
+  arg = arg;
+  int i;
+  
+  int index = thread_get_current_thread( ) - 3;
+  int sum = 0;
+  
+  for(i=0; i<5; i++){
+    sum += (dotdata->a)[index + 1] * (dotdata->b)[index + 1];
+  }
+  
+  lock_acquire( &lock );
+  kprintf("Thread after lock acquire: %d with sum: %d\n", thread_get_current_thread( ), sum);
+  (dotdata->sum) += sum;
+  lock_release( &lock );
+ 
+  threadcount--;
+  thread_finish();
+}
 
 /**
  * Fallback function for system startup. This function is executed
@@ -100,6 +175,56 @@ void init_startup_fallback(void) {
     DEBUG("debuginit", "Console test done, %d bytes written\n", len);
   }
 
+  if (bootargs_get("mutex_dot") != NULL) {
+    int i;
+    TID_t t[DTHREADS];
+    
+    threadcount = 0;
+    if ( lock_reset(&lock) != 0 ){
+      KERNEL_PANIC("FUCK LOCK.\n");
+    }
+
+    /* initialize data */
+    dotdata->sum = 0;
+    dotdata->veclen = VECLENGTH;
+    
+    for(i=0; i<VECLENGTH; i++){
+      (dotdata->a)[i] = i;
+      (dotdata->b)[i] = i;
+    }
+    
+    /* create threads */
+    for(i=0; i<DTHREADS; i++){
+      t[i] = thread_create(&dot_thread, 0 );
+      threadcount++;
+    }
+    /* launch threads */
+    for(i=0; i<DTHREADS; i++){
+      thread_run( t[i]  );
+    }
+    /* wait fot threads to finish */
+    while( threadcount != 0 ){
+      thread_switch( );
+    }
+    kprintf("Dotproduct: %d\n", dotdata->sum);
+  }
+
+  if (bootargs_get("mutex_lock") != NULL) {
+    TID_t a;
+    TID_t b;
+    
+    *read = 0;
+    lock_reset(&lock);
+
+    a = thread_create(&thread_a, 1 );
+    b = thread_create(&thread_b, 1 );
+
+    thread_run( a );
+    thread_run( b );
+    
+
+  }
+  
   /* Nothing else to do, so we shut the system down. */
   kprintf("Startup fallback code ends.\n");
   halt_kernel();
@@ -158,7 +283,7 @@ void init(void)
 {
   TID_t startup_thread;
   int numcpus;
-  
+
   /* Initialize polling TTY driver for kprintf() usage. */
   polltty_init();
 
@@ -184,6 +309,14 @@ void init(void)
     int seed = atoi(bootargs_get("randomseed"));
     kprintf("Seeding pseudorandom number generator with %i\n", seed);
     _set_rand_seed(seed);
+  }
+
+  /* allocate memory for test datastructures */
+  if (bootargs_get("mutex_dot") != NULL) {
+  dotdata = (DOTDATA*)kmalloc( sizeof( DOTDATA ) );
+  }
+  if (bootargs_get("mutex_lock") != NULL) {
+  read = (int*)kmalloc( sizeof( int ) );
   }
 
   numcpus = cpustatus_count();
@@ -216,7 +349,7 @@ void init(void)
 
   kwrite("Initializing virtual memory\n");
   vm_init();
-   
+    
   kprintf("Creating initialization thread\n");
   
   startup_thread = thread_create(&init_startup_thread, 0);
