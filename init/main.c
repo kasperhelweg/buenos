@@ -92,9 +92,9 @@ void thread_a( uint32_t arg)
   }
 
   if( a == *read){
-    kprintf("a == read! ( good )\n");
+    kprintf("a == read ( good! )\n");
   } else {
-    kprintf("a != read! ( bad )\n");
+    kprintf("a != read ( bad! )\n");
   }
   threadcount--;
   thread_finish( );
@@ -176,7 +176,6 @@ void dot_thread_signal( uint32_t arg)
     if( thread_get_current_thread( ) % 2 == 0) {
       thread_yield();
     }
-  
   }
   
   lock_acquire( &lock );
@@ -311,7 +310,6 @@ void init_startup_fallback(void) {
     kprintf("Dotproduct: %d\n", dotdata->sum);
     kprintf("Locked: %d.\n", lock.count);
   }
-
 
   if (bootargs_get("mutex_lock") != NULL) {
     TID_t a;

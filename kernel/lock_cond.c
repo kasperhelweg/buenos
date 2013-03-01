@@ -119,25 +119,33 @@ void condition_wait( cond_t* cond, lock_t* lock )
   intr_status = _interrupt_disable( );
   spinlock_acquire( &lock_cond_slock );
   /* sleep on cindition */
-  sleepq_add( cond );
-  spinlock_release( &lock_cond_slock );
+  sleepq_add( cond ); 
+  /* the lock is realesed without a call to lock_release
+   * since this would require the release of the spinlock
+   * thus another thread might steal the session
+  */
+  lock->state = LOCK_FREE; lock->owner = LOCK_NOT_OWNED; 
+  sleepq_wake( lock );
+  spinlock_release( &lock_cond_slock );  
   _interrupt_set_state( intr_status );
-  lock_release( lock );
   thread_switch();
+
   lock_acquire( lock );
-  
 }
 
 void condition_signal( cond_t* cond, lock_t* lock )
 {
+  /* don't need to do anything with the lock right now */
   lock = lock;
+  /* wake thread sleeping on cond */
   sleepq_wake( cond );
-  
 }
 
 void condition_broadcast( cond_t* cond, lock_t* lock )
 {
+  /* don't need to do anything with the lock right now */
   lock = lock;
+  /* wake all thread's sleeping on cond */
   sleepq_wake_all( cond );
 }
 

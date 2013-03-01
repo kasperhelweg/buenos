@@ -38,11 +38,9 @@ typedef struct cond_t {
   cond_state_t state;
 } cond_t;
 
-
 int lock_reset( lock_t* lock );
-
 /*
- * This procedure will tru to acquire the lock
+ * This procedure will try to acquire the lock
  * If it's not succesfull, the calling thread is put in the sleep queue.
 */
 void lock_acquire( lock_t* lock );
