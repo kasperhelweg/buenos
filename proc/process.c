@@ -325,7 +325,7 @@ void process_finish( int retval )
        parent must call wait() or join() */
     current_process->state = PROCESS_ZOMBIE;  
     /* wake sleeping resource(s) */
-    sleepq_wake( current_process );
+    sleepq_wake_all( current_process );
     /*==========LOCKED==========*/
     spinlock_release( &pt_slock );  
     _interrupt_set_state( intr_status );
@@ -354,21 +354,27 @@ int process_join( process_id_t pid )
   intr_status = _interrupt_disable( );
   spinlock_acquire( &pt_slock );
   /*==========LOCKED==========*/
-  while( join_process->state != PROCESS_ZOMBIE ){
+  
+  while( join_process->state != PROCESS_ZOMBIE && join_process->state != PROCESS_DEAD ){
     sleepq_add( join_process );
-    /* this is weid... threade is always running it appears */
+    /* this is weid... thread is always running it appears */
     current_process->state = thread_get_current_thread_entry( )->state;
     spinlock_release( &pt_slock );
     thread_switch( );
     spinlock_acquire( &pt_slock );  
   } 
-  /* get return value */
-  retval = join_process->return_code;
-  /* clean up join process */
-  join_process->parent = NULL;
-  join_process->left_child = NULL;
-  join_process->right_child = NULL;
-  join_process->state = PROCESS_DEAD;
+  if( join_process->state == PROCESS_ZOMBIE ){
+    /* get return value */
+    retval = join_process->return_code;
+    /* clean up join process */
+    join_process->parent = NULL;
+    join_process->left_child = NULL;
+    join_process->right_child = NULL;
+    join_process->state = PROCESS_DEAD;
+    /* handle a process that is already dead*/
+  } else {
+    retval = -1;
+  }
   /*==========LOCKED==========*/
   spinlock_release( &pt_slock );  
   _interrupt_set_state( intr_status );
