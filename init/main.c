@@ -60,7 +60,7 @@
 
 
 #define DTHREADS 29
-#define VECLENGTH DTHREADS * 5
+#define VECLENGTH DTHREADS * 7
 typedef struct DOTDATA 
  {
    int      a[VECLENGTH];
@@ -91,10 +91,11 @@ void thread_a( uint32_t arg)
   }
 
   if( a == *read){
-    kprintf("GREAT!\n");
+    kprintf("a == read! ( good )\n");
   } else {
-    kprintf("FAIL!\n");
+    kprintf("a != read! ( bad )\n");
   }
+  threadcount--;
   thread_finish( );
 }
 
@@ -107,6 +108,7 @@ void thread_b( uint32_t arg)
   } else {
     *read = 1;
   }
+  threadcount--;
   thread_finish( );
 } 
 
@@ -118,8 +120,11 @@ void dot_thread( uint32_t arg)
   int index = thread_get_current_thread( ) - 3;
   int sum = 0;
   
-  for(i=0; i<5; i++){
+  for( i=0; i < 7; i++ ){
     sum += (dotdata->a)[index + 1] * (dotdata->b)[index + 1];
+    if( thread_get_current_thread( ) % 2 == 0) {
+      thread_yield();
+    }
   }
   
   lock_acquire( &lock );
@@ -214,6 +219,8 @@ void init_startup_fallback(void) {
     TID_t b;
     
     *read = 0;
+    threadcount = 2;
+
     lock_reset(&lock);
     if ( lock.state != LOCK_FREE ){
       KERNEL_PANIC("Lock fail.\n");
@@ -224,7 +231,13 @@ void init_startup_fallback(void) {
 
     thread_run( a );
     thread_run( b );
+
+    while( threadcount != 0 ){
+      thread_switch();
+    }
   }
+
+  kprintf("Locked: %d.\n", lock.count);
   
   /* Nothing else to do, so we shut the system down. */
   kprintf("Startup fallback code ends.\n");

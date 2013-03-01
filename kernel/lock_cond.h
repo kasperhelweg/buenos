@@ -23,6 +23,7 @@ typedef enum {
 
 typedef struct lock_t {
   lock_state_t state;
+  int initialized;
   int owner;
   unsigned int count;
 } lock_t;

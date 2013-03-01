@@ -27,9 +27,9 @@ static spinlock_t lock_cond_slock;
 int lock_reset( lock_t* lock )
 {
   /* if on mult.proc. machine, fallback to spinlock numcpus = cpustatus_count(); */
-  if( lock != NULL && !(lock->state == LOCK_FREE || lock->state == LOCK_LOCKED) ) {
-    lock->state = LOCK_FREE; lock->owner = LOCK_NOT_OWNED; lock->count = 0;
+  if( lock != NULL && lock->initialized != 1 ) {
     spinlock_reset( &lock_cond_slock );
+    lock->state = LOCK_FREE; lock->owner = LOCK_NOT_OWNED; lock->count = 0; lock->initialized = 1;
     return LOCK_FREE;
   } else {
     return LOCK_RESET_FAILED;
@@ -49,9 +49,14 @@ void lock_acquire( lock_t* lock )
     spinlock_release( &lock_cond_slock );
     break;
   case LOCK_LOCKED:
-    sleepq_add( lock );
+    while( lock->state != LOCK_FREE ){
+      sleepq_add( lock );
+      spinlock_release( &lock_cond_slock );
+      thread_switch();
+      spinlock_acquire( &lock_cond_slock );
+    }
+    lock->state = LOCK_LOCKED; lock->owner = (int)thread_get_current_thread( ); lock->count++;
     spinlock_release( &lock_cond_slock );
-    thread_switch();
     break;
   default:
     spinlock_release( &lock_cond_slock );
