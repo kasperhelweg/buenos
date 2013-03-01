@@ -100,14 +100,13 @@ void thread_a( uint32_t arg)
 
 void thread_b( uint32_t arg)
 {
-  if( arg == 0 ){
+  if( arg == 0 ){  
     lock_acquire( &lock );
     *read = 1;
     lock_release( &lock );
   } else {
     *read = 1;
   }
-  kprintf("READ: %d\n", *read);
   thread_finish( );
 } 
 
@@ -180,8 +179,9 @@ void init_startup_fallback(void) {
     TID_t t[DTHREADS];
     
     threadcount = 0;
-    if ( lock_reset(&lock) != 0 ){
-      KERNEL_PANIC("FUCK LOCK.\n");
+    lock_reset(&lock);
+    if ( lock.state != LOCK_FREE ){
+      KERNEL_PANIC("Lock fail.\n");
     }
 
     /* initialize data */
@@ -215,14 +215,15 @@ void init_startup_fallback(void) {
     
     *read = 0;
     lock_reset(&lock);
-
-    a = thread_create(&thread_a, 1 );
-    b = thread_create(&thread_b, 1 );
+    if ( lock.state != LOCK_FREE ){
+      KERNEL_PANIC("Lock fail.\n");
+    }
+    
+    a = thread_create(&thread_a, 0 );
+    b = thread_create(&thread_b, 0 );
 
     thread_run( a );
     thread_run( b );
-    
-
   }
   
   /* Nothing else to do, so we shut the system down. */
@@ -313,10 +314,10 @@ void init(void)
 
   /* allocate memory for test datastructures */
   if (bootargs_get("mutex_dot") != NULL) {
-  dotdata = (DOTDATA*)kmalloc( sizeof( DOTDATA ) );
+    dotdata = (DOTDATA*)kmalloc( sizeof( int ) );
   }
   if (bootargs_get("mutex_lock") != NULL) {
-  read = (int*)kmalloc( sizeof( int ) );
+    read = (int*)kmalloc( sizeof( int ) );
   }
 
   numcpus = cpustatus_count();
