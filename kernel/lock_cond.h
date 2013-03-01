@@ -21,6 +21,7 @@ typedef enum {
   LOCK_LOCKED
 } lock_state_t;
 
+
 typedef struct lock_t {
   lock_state_t state;
   int initialized;
@@ -28,13 +29,25 @@ typedef struct lock_t {
   unsigned int count;
 } lock_t;
 
-/* dummy. remove */
-typedef int cond_t;
+typedef enum {
+  COND_UNINITIALIZED,
+  COND_INITIALIZED
+} cond_state_t;
+
+typedef struct cond_t {
+  cond_state_t state;
+} cond_t;
+
 
 int lock_reset( lock_t* lock );
+
+/*
+ * This procedure will tru to acquire the lock
+ * If it's not succesfull, the calling thread is put in the sleep queue.
+*/
 void lock_acquire( lock_t* lock );
 void lock_release( lock_t* lock );
-lock_state_t lock_try_lock( lock_t* lock );
+int lock_try_lock( lock_t* lock );
 
 /* condition variables */
 void condition_init( cond_t* cond );

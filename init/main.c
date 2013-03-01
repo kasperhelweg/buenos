@@ -73,6 +73,7 @@ static DOTDATA* dotdata;
 static int threadcount;
 
 static lock_t lock;
+static cond_t cond;
 
 static int* read;
 
@@ -130,6 +131,60 @@ void dot_thread( uint32_t arg)
   lock_acquire( &lock );
   kprintf("Thread after lock acquire: %d with sum: %d\n", thread_get_current_thread( ), sum);
   (dotdata->sum) += sum;
+  lock_release( &lock );
+ 
+  threadcount--;
+  thread_finish();
+}
+
+void dot_thread_wait( uint32_t arg)
+{
+  arg = arg;
+  int i;
+  
+  int index = thread_get_current_thread( ) - 3;
+  int sum = 0;
+  lock_acquire( &lock );
+  while( dotdata->sum < 30000 ){
+    condition_wait(&cond, &lock);
+    for( i=0; i < 7; i++ ){
+      sum += (dotdata->a)[index + 1] * (dotdata->b)[index + 1];
+      if( thread_get_current_thread( ) % 2 == 0) {
+        thread_yield();
+      }
+    }
+  } 
+  kprintf("Thread after lock acquire: %d with sum: %d\n", thread_get_current_thread( ), sum);
+  (dotdata->sum) += sum;
+  lock_release( &lock );
+  
+  threadcount--;
+  thread_finish();
+}
+
+
+void dot_thread_signal( uint32_t arg)
+{
+  arg = arg;
+  int i;
+  
+  int index = thread_get_current_thread( ) - 3;
+  int sum = 0;
+  
+  for( i=0; i < 7; i++ ){
+    sum += (dotdata->a)[index + 1] * (dotdata->b)[index + 1];
+    if( thread_get_current_thread( ) % 2 == 0) {
+      thread_yield();
+    }
+  
+  }
+  
+  lock_acquire( &lock );
+  kprintf("Thread after lock acquire: %d with sum: %d\n", thread_get_current_thread( ), sum);
+  (dotdata->sum) += sum;
+  if(dotdata->sum >= 30000){
+    condition_signal(&cond, &lock);    
+  }
   lock_release( &lock );
  
   threadcount--;
@@ -212,7 +267,51 @@ void init_startup_fallback(void) {
       thread_switch( );
     }
     kprintf("Dotproduct: %d\n", dotdata->sum);
+    kprintf("Locked: %d.\n", lock.count);
   }
+
+  if (bootargs_get("mutex_dot_cond") != NULL) {
+    int i;
+    TID_t t[DTHREADS];
+    
+    threadcount = 1;
+    lock_reset(&lock);
+    condition_init(&cond);
+    
+    if ( lock.state != LOCK_FREE ){
+      KERNEL_PANIC("Lock fail.\n");
+    }
+    
+    /* initialize data */
+    dotdata->sum = 0;
+    dotdata->veclen = VECLENGTH;
+    
+    for(i=0; i<VECLENGTH; i++){
+      (dotdata->a)[i] = i;
+      (dotdata->b)[i] = i;
+    }
+    
+    /* create threads */
+    t[0] = thread_create(&dot_thread_wait, 0 );
+    thread_run( t[0]  );
+
+    for(i=1; i<DTHREADS; i++){
+      t[i] = thread_create(&dot_thread_signal, 0 );
+      threadcount++;
+    }
+    
+    /* launch threads */
+    for(i=1; i<DTHREADS; i++){
+      thread_run( t[i]  );
+    }
+    /* wait fot threads to finish */
+    while( threadcount != 0 ){
+      thread_switch( );
+    }
+    kprintf("Dotproduct: %d\n", dotdata->sum);
+    kprintf("Locked: %d.\n", lock.count);
+  }
+
 
   if (bootargs_get("mutex_lock") != NULL) {
     TID_t a;
@@ -235,9 +334,8 @@ void init_startup_fallback(void) {
     while( threadcount != 0 ){
       thread_switch();
     }
+    kprintf("Locked: %d.\n", lock.count);
   }
-
-  kprintf("Locked: %d.\n", lock.count);
   
   /* Nothing else to do, so we shut the system down. */
   kprintf("Startup fallback code ends.\n");
@@ -329,10 +427,15 @@ void init(void)
   if (bootargs_get("mutex_dot") != NULL) {
     dotdata = (DOTDATA*)kmalloc( sizeof( int ) );
   }
+  if (bootargs_get("mutex_dot_cond") != NULL) {
+    dotdata = (DOTDATA*)kmalloc( sizeof( int ) );
+  }
+
   if (bootargs_get("mutex_lock") != NULL) {
     read = (int*)kmalloc( sizeof( int ) );
   }
 
+  
   numcpus = cpustatus_count();
   kprintf("Detected %i CPUs\n", numcpus);
   KERNEL_ASSERT(numcpus <= CONFIG_MAX_CPUS);
