@@ -401,13 +401,7 @@ process_id_t process_get_free_table_slot( void )
 {
   process_id_t pid = 1;
   process_id_t first_dead_pid = -1;
-    
-  /*
-  interrupt_status_t intr_status;
-  intr_status = _interrupt_disable( );
-  spinlock_acquire( &pt_slock );   
-  */
-
+  
   interrupt_status_t intr_status;
   intr_status = _interrupt_disable( );
   spinlock_acquire( &pt_slock );   

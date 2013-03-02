@@ -27,12 +27,12 @@ static spinlock_t lock_cond_slock;
 int lock_reset( lock_t* lock )
 {
   /* check if the lock has been allocated on has not been reset before */
-  if( lock != NULL && lock->initialized != 1 ) {
+  if( lock != NULL ) {
     spinlock_reset( &lock_cond_slock );
-    lock->state = LOCK_FREE; lock->owner = LOCK_NOT_OWNED; lock->count = 0; lock->initialized = 1;
-    return LOCK_FREE;
+    lock->state = LOCK_FREE; lock->owner = LOCK_NOT_OWNED; lock->count = 0;
+    return 0;
   } else {
-    return LOCK_RESET_FAILED;
+    return -1;
   }
 }
 
@@ -44,26 +44,19 @@ void lock_acquire( lock_t* lock )
   intr_status = _interrupt_disable( );
   spinlock_acquire( &lock_cond_slock );
   /*==========LOCKED==========*/
-  switch( lock->state ) {
-    /* the lock is FREE and can be acquired */
-  case LOCK_FREE:
-    lock->state = LOCK_LOCKED; lock->owner = (int)thread_get_current_thread( ); lock->count++;
-    spinlock_release( &lock_cond_slock );
-    break;
-  case LOCK_LOCKED:
-    /* add current thread to sleep queue. sleep on the lock */
+  if (lock->state == LOCK_FREE) {
+     lock->state = LOCK_LOCKED; lock->owner = (int)thread_get_current_thread( ); lock->count++;
+  } else {
+     /* add current thread to sleep queue. sleep on the lock */
     sleepq_add( lock );
     spinlock_release( &lock_cond_slock );
     thread_switch();
     /* acquire the lock on wakeup. no loop is needed, since threads are woken up 1 by 1 */
     spinlock_acquire( &lock_cond_slock );
     lock->state = LOCK_LOCKED; lock->owner = (int)thread_get_current_thread( ); lock->count++;
-    spinlock_release( &lock_cond_slock );
-    break;
-  default:
-    spinlock_release( &lock_cond_slock );
   }
   /*==========LOCKED==========*/
+  spinlock_release( &lock_cond_slock );
   _interrupt_set_state( intr_status );
 }
 
@@ -83,28 +76,6 @@ void lock_release( lock_t* lock )
   _interrupt_set_state( intr_status );
 }
 
-/* try to acquire the lock. dont sleep if not succesfull */
-int lock_try_lock( lock_t* lock )
-{
-  int retval = 0;
-  interrupt_status_t intr_status;
-
-  intr_status = _interrupt_disable( );
-  spinlock_acquire( &lock_cond_slock );
-  /*==========LOCKED==========*/
-  switch( lock->state ) {
-  case LOCK_FREE:
-    lock->state = LOCK_LOCKED; lock->owner = (int)thread_get_current_thread( ); lock->count++;
-    spinlock_release( &lock_cond_slock );
-    break;
-  default:
-    retval = -1;
-    spinlock_release( &lock_cond_slock );
-  }
-  /*==========LOCKED==========*/
-  _interrupt_set_state( intr_status );
-  return retval;
-}
 
 /* condition variables */
 void condition_init( cond_t* cond )

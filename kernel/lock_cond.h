@@ -13,7 +13,6 @@
  * @{
  */
 
-#define LOCK_RESET_FAILED -1
 #define LOCK_NOT_OWNED -1
 
 typedef enum {
@@ -24,7 +23,6 @@ typedef enum {
 
 typedef struct lock_t {
   lock_state_t state;
-  int initialized;
   int owner;
   unsigned int count;
 } lock_t;
@@ -38,6 +36,10 @@ typedef struct cond_t {
   cond_state_t state;
 } cond_t;
 
+/*
+ * Initialize a lock
+ * 
+ */
 int lock_reset( lock_t* lock );
 /*
  * This procedure will try to acquire the lock
