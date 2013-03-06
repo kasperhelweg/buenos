@@ -22,14 +22,11 @@
  * @{
  */
 
-static spinlock_t lock_cond_slock;
-
 int lock_reset( lock_t* lock )
 {
-  /* check if the lock has been allocated on has not been reset before */
   if( lock != NULL ) {
-    spinlock_reset( &lock_cond_slock );
-    lock->state = LOCK_FREE; lock->owner = LOCK_NOT_OWNED; lock->count = 0;
+    spinlock_reset( &(lock->slock) );
+    lock->state = LOCK_FREE; 
     return 0;
   } else {
     return -1;
@@ -42,23 +39,21 @@ void lock_acquire( lock_t* lock )
 
   /* acquire spinlock for reading lock->state */
   intr_status = _interrupt_disable( );
-  spinlock_acquire( &lock_cond_slock );
+  spinlock_acquire( &(lock->slock) );
   /*==========LOCKED==========*/
-  if (lock->state == LOCK_FREE) {
-    lock->state = LOCK_LOCKED; lock->owner = (int)thread_get_current_thread( ); lock->count++;
-  } else {
-    /* add current thread to sleep queue. sleep on the lock */
-    while( lock->state != LOCK_FREE ){
-      sleepq_add( lock );
-      spinlock_release( &lock_cond_slock );
-      thread_switch();
-      spinlock_acquire( &lock_cond_slock );
-    }
-    /* acquire the lock on wakeup. */
-    lock->state = LOCK_LOCKED; lock->owner = (int)thread_get_current_thread( ); lock->count++;
+
+  /* add current thread to sleep queue. sleep on the lock */
+  while( lock->state != LOCK_FREE ){
+    sleepq_add( lock );
+    spinlock_release( &(lock->slock) );
+    thread_switch();
+    spinlock_acquire( &(lock->slock) );
   }
+  /* acquire the lock on wakeup. */
+  lock->state = LOCK_LOCKED; 
+  lock->count++;
   /*==========LOCKED==========*/
-  spinlock_release( &lock_cond_slock );
+  spinlock_release( &(lock->slock) );
   _interrupt_set_state( intr_status );
 }
 
@@ -67,14 +62,14 @@ void lock_release( lock_t* lock )
   interrupt_status_t intr_status;
 
   intr_status = _interrupt_disable( );
-  spinlock_acquire( &lock_cond_slock );
+  spinlock_acquire( &(lock->slock) );
   /*==========LOCKED==========*/
   /* free the lock */
-  lock->state = LOCK_FREE; lock->owner = LOCK_NOT_OWNED; 
+  lock->state = LOCK_FREE; 
   /* wake first thread waiting */
   sleepq_wake( lock );
   /*==========LOCKED==========*/
-  spinlock_release( &lock_cond_slock );
+  spinlock_release( &(lock->slock) );
   _interrupt_set_state( intr_status );
 }
 
@@ -90,7 +85,7 @@ void condition_wait( cond_t* cond, lock_t* lock )
   interrupt_status_t intr_status;
 
   intr_status = _interrupt_disable( );
-  spinlock_acquire( &lock_cond_slock );
+  spinlock_acquire( &(lock->slock) );
   /*==========LOCKED==========*/
   /* sleep on cindition */
   sleepq_add( cond ); 
@@ -98,10 +93,10 @@ void condition_wait( cond_t* cond, lock_t* lock )
    * since this would require the release of the spinlock
    * thus another thread might steal the session
   */
-  lock->state = LOCK_FREE; lock->owner = LOCK_NOT_OWNED; 
+  lock->state = LOCK_FREE; 
   sleepq_wake( lock );
   /*==========LOCKED==========*/
-  spinlock_release( &lock_cond_slock );  
+  spinlock_release( &(lock->slock) );  
   _interrupt_set_state( intr_status );
   
   thread_switch();

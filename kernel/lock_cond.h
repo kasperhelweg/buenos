@@ -12,19 +12,17 @@
  *
  * @{
  */
-
-#define LOCK_NOT_OWNED -1
+#include "kernel/spinlock.h"
 
 typedef enum {
   LOCK_FREE,
   LOCK_LOCKED
 } lock_state_t;
 
-
 typedef struct lock_t {
   lock_state_t state;
-  int owner;
-  unsigned int count;
+  spinlock_t slock;
+  int count;
 } lock_t;
 
 typedef enum {
