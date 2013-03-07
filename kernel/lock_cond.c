@@ -37,11 +37,9 @@ void lock_acquire( lock_t* lock )
 {
   interrupt_status_t intr_status;
 
-  /* acquire spinlock for reading lock->state */
   intr_status = _interrupt_disable( );
   spinlock_acquire( &(lock->slock) );
   /*==========LOCKED==========*/
-
   /* add current thread to sleep queue. sleep on the lock */
   while( lock->state != LOCK_FREE ){
     sleepq_add( lock );
@@ -73,11 +71,10 @@ void lock_release( lock_t* lock )
   _interrupt_set_state( intr_status );
 }
 
-
 /* condition variables */
 void condition_init( cond_t* cond )
 {
-  cond->state = COND_INITIALIZED;
+  cond->state = 666;
 }
 
 void condition_wait( cond_t* cond, lock_t* lock )

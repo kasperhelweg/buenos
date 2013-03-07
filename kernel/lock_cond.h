@@ -25,11 +25,7 @@ typedef struct lock_t {
   int count;
 } lock_t;
 
-typedef enum {
-  COND_UNINITIALIZED,
-  COND_INITIALIZED
-} cond_state_t;
-
+typedef int cond_state_t;
 typedef struct cond_t {
   cond_state_t state;
 } cond_t;
