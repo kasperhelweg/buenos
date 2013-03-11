@@ -71,16 +71,18 @@ void condition_wait( cond_t* cond, lock_t* lock )
 {
   interrupt_status_t intr_status;
   intr_status = _interrupt_disable( );
-
-  spinlock_acquire( &(lock->slock) );  
+  /* add thread to sleep-queue */
+  spinlock_acquire( &(lock->slock) );
+  /*==========LOCKED==========*/
   sleepq_add( cond );
-  spinlock_release( &(lock->slock) );  
-
+  spinlock_release( &(lock->slock) );
+  /*==========LOCKED==========*/
+  _interrupt_set_state( intr_status );
+  /* release the lock and switch thread */
   lock_release( lock );
   thread_switch( );
+  /* acquire the lock */
   lock_acquire( lock );
-  
-  _interrupt_set_state( intr_status );
 }
 
 void condition_signal( cond_t* cond, lock_t* lock )
