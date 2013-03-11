@@ -9,16 +9,6 @@
 
 /** @name Mutex locks
  *
- * The sleep queue is the mechanism which allows threads to go to
- * sleep while waiting on a resource to become available and be woken
- * once said resource does become available. A thread going to sleep
- * waiting for a resource (usually a memory address) is placed in a
- * hash table, from which it can be quickly found and awakened once
- * the resource becomes available.
- *
- * The resources are referenced by memory address. The address is used
- * only as a key, it is never referenced by the sleep queue mechanism.
- *
  * @{
  */
 
@@ -36,7 +26,7 @@ int lock_reset( lock_t* lock )
 void lock_acquire( lock_t* lock )
 {
   interrupt_status_t intr_status;
-
+  
   intr_status = _interrupt_disable( );
   spinlock_acquire( &(lock->slock) );
   /*==========LOCKED==========*/
@@ -58,7 +48,7 @@ void lock_acquire( lock_t* lock )
 void lock_release( lock_t* lock )
 {
   interrupt_status_t intr_status;
-
+  
   intr_status = _interrupt_disable( );
   spinlock_acquire( &(lock->slock) );
   /*==========LOCKED==========*/
@@ -74,30 +64,23 @@ void lock_release( lock_t* lock )
 /* condition variables */
 void condition_init( cond_t* cond )
 {
-  cond->state = 666;
+  cond->state = -666;
 }
 
 void condition_wait( cond_t* cond, lock_t* lock )
 {
   interrupt_status_t intr_status;
+  intr_status = _interrupt_disable();
 
-  intr_status = _interrupt_disable( );
-  spinlock_acquire( &(lock->slock) );
-  /*==========LOCKED==========*/
-  /* sleep on cindition */
-  sleepq_add( cond ); 
-  /* the lock is realesed without a call to lock_release
-   * since this would require the release of the spinlock
-   * thus another thread might steal the session
-  */
-  lock->state = LOCK_FREE; 
-  sleepq_wake( lock );
-  /*==========LOCKED==========*/
+  spinlock_acquire( &(lock->slock) );  
+  sleepq_add( cond );
   spinlock_release( &(lock->slock) );  
-  _interrupt_set_state( intr_status );
-  
-  thread_switch();
+
+  lock_release( lock );
+  thread_switch( );
   lock_acquire( lock );
+  
+  _interrupt_set_state(intr_status);
 }
 
 void condition_signal( cond_t* cond, lock_t* lock )

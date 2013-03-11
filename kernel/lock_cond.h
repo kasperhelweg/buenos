@@ -38,7 +38,7 @@ int lock_reset( lock_t* lock );
 /*
  * This procedure will try to acquire the lock
  * If it's not succesfull, the calling thread is put in the sleep queue.
-*/
+ */
 void lock_acquire( lock_t* lock );
 void lock_release( lock_t* lock );
 int lock_try_lock( lock_t* lock );
