@@ -64,13 +64,13 @@ void lock_release( lock_t* lock )
 /* condition variables */
 void condition_init( cond_t* cond )
 {
-  cond->state = -666;
+  cond->state = 1122;
 }
 
 void condition_wait( cond_t* cond, lock_t* lock )
 {
   interrupt_status_t intr_status;
-  intr_status = _interrupt_disable();
+  intr_status = _interrupt_disable( );
 
   spinlock_acquire( &(lock->slock) );  
   sleepq_add( cond );
@@ -80,7 +80,7 @@ void condition_wait( cond_t* cond, lock_t* lock )
   thread_switch( );
   lock_acquire( lock );
   
-  _interrupt_set_state(intr_status);
+  _interrupt_set_state( intr_status );
 }
 
 void condition_signal( cond_t* cond, lock_t* lock )
